@@ -3,6 +3,7 @@ project(minigun-samples C CXX)
 
 # find packages
 include(cmake/util/Util.cmake)
+include(cmake/util/MshadowUtil.cmake)
 include(cmake/util/FindCUDA.cmake)
 
 if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
@@ -53,5 +54,11 @@ else(MSVC)
 endif(MSVC)
 
 include(cmake/modules/CUDA.cmake)
+
+if(USE_CUDA)
+  project(minigun-samples C CXX CUDA)
+endif()
+
+file(GLOB_RECURSE MINIGUN_SRC "minigun/minigun/*.h")
 
 add_subdirectory(samples)

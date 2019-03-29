@@ -3,12 +3,17 @@
 
 #include "./base.h"
 #include "./csr.h"
+#ifdef MINIGUN_USE_CUDA
+#include <cuda_runtime.h>
+#endif  // MINIGUN_USE_CUDA
 
 namespace minigun {
 namespace advance {
 
 struct RuntimeConfig {
-  MGStreamHandle stream;
+#ifdef MINIGUN_USE_CUDA
+  cudaStream_t stream{nullptr};
+#endif  // MINIGUN_USE_CUDA
 };
 
 struct DefaultAllocator {
@@ -24,8 +29,8 @@ struct DispatchXPU {
   static void Advance(
       const RuntimeConfig& config,
       const Csr& csr,
-      VFrame* vframe,
-      EFrame* eframe,
+      VFrame vframe,
+      EFrame eframe,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
       const Alloc& alloc) {
@@ -39,17 +44,21 @@ template <typename VFrame,
           typename Alloc = DefaultAllocator>
 void Advance(const RuntimeConfig& config,
              const Csr& csr,
-             VFrame* vframe,
-             EFrame* eframe,
+             VFrame vframe,
+             EFrame eframe,
              IntArray1D input_frontier,
              IntArray1D output_frontier,
              const Alloc& alloc = Alloc()) {
-  DispatchXPU::Advance<kDLGPU, VFrame, EFrame, Functor, Alloc>(
+  DispatchXPU<kDLGPU, VFrame, EFrame, Functor, Alloc>::Advance(
       config, csr, vframe, eframe,
       input_frontier, output_frontier, alloc);
 }
 
 }  // namespace advance
 }  // namespace minigun
+
+#ifdef MINIGUN_USE_CUDA
+#include "./cuda/advance.cuh"
+#endif
 
 #endif  // MINIGUN_ADVANCE_H_
