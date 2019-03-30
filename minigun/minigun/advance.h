@@ -21,16 +21,14 @@ struct DefaultAllocator {
 };
 
 template <int XPU,
-          typename VFrame,
-          typename EFrame,
+          typename GData,
           typename Functor,
           typename Alloc>
 struct DispatchXPU {
   static void Advance(
       const RuntimeConfig& config,
       const Csr& csr,
-      VFrame vframe,
-      EFrame eframe,
+      GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
       const Alloc& alloc) {
@@ -38,19 +36,17 @@ struct DispatchXPU {
   }
 };
 
-template <typename VFrame,
-          typename EFrame,
+template <typename GData,
           typename Functor,
           typename Alloc = DefaultAllocator>
 void Advance(const RuntimeConfig& config,
              const Csr& csr,
-             VFrame vframe,
-             EFrame eframe,
+             GData* gdata,
              IntArray1D input_frontier,
              IntArray1D output_frontier,
              const Alloc& alloc = Alloc()) {
-  DispatchXPU<kDLGPU, VFrame, EFrame, Functor, Alloc>::Advance(
-      config, csr, vframe, eframe,
+  DispatchXPU<kDLGPU, GData, Functor, Alloc>::Advance(
+      config, csr, gdata,
       input_frontier, output_frontier, alloc);
 }
 

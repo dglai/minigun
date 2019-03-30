@@ -1,2 +1,1 @@
-
-add_subdirectory(pr)
+add_subdirectory(spmv)

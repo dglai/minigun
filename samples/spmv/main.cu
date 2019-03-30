@@ -33,19 +33,20 @@ bool Equal(const std::vector<T>& v1,
   return true;
 }
 
-struct VData {
+struct GData {
   float* cur{nullptr};
   float* next{nullptr};
+  float* weight{nullptr};
 };
 
 struct PRFunctor {
   static __device__ __forceinline__ bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, VData vdata, float* edata) {
+      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, VData vdata, float* edata) {
-    atomicAdd(vdata.next + dst, vdata.cur[src] * edata[eid]);
+      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    atomicAdd(gdata->next + dst, gdata->cur[src] * gdata->weight[eid]);
   }
 };
 
@@ -111,14 +112,16 @@ int main(int argc, char** argv) {
     evec[i] = (float)rand() / RAND_MAX;
   }
 
-  VData vdata;
-  CUDA_CALL(cudaMalloc(&vdata.cur, sizeof(float) * N));
-  CUDA_CALL(cudaMemcpy(vdata.cur, &vvec[0], sizeof(float) * N, cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMalloc(&vdata.next, sizeof(float) * N));
-  CUDA_CALL(cudaMemset(vdata.next, 0, sizeof(float) * N));
-  float *edata = nullptr;
-  CUDA_CALL(cudaMalloc(&edata, sizeof(float) * M));
-  CUDA_CALL(cudaMemcpy(edata, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
+  GData gdata;
+  CUDA_CALL(cudaMalloc(&gdata.cur, sizeof(float) * N));
+  CUDA_CALL(cudaMemcpy(gdata.cur, &vvec[0], sizeof(float) * N, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&gdata.next, sizeof(float) * N));
+  CUDA_CALL(cudaMemset(gdata.next, 0, sizeof(float) * N));
+  CUDA_CALL(cudaMalloc(&gdata.weight, sizeof(float) * M));
+  CUDA_CALL(cudaMemcpy(gdata.weight, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
+  GData* d_gdata;
+  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData)));
+  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData), cudaMemcpyHostToDevice));
 
   CUDA_CALL(cudaDeviceSynchronize());
 
@@ -127,14 +130,14 @@ int main(int argc, char** argv) {
       vvec, evec);
   //Print(truth);
 
-  minigun::advance::Advance<VData, float*, PRFunctor>(
-      config, csr, vdata, edata, infront, outfront);
+  minigun::advance::Advance<GData, PRFunctor>(
+      config, csr, d_gdata, infront, outfront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 
   // verify output
   std::vector<float> rst(N);
-  CUDA_CALL(cudaMemcpy(&rst[0], vdata.next, sizeof(float) * N, cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(&rst[0], gdata.next, sizeof(float) * N, cudaMemcpyDeviceToHost));
   //Print(rst);
 
   std::cout << "Correct? " << Equal(truth, rst) << std::endl;

@@ -1,4 +1,4 @@
-project(pr)
+project(spmv)
 message("-- Project added: ${PROJECT_NAME}")
 
 CUDA_ADD_EXECUTABLE(${PROJECT_NAME} main.cu)

@@ -24,21 +24,13 @@ __device__ __forceinline__ mg_int BinarySearchSrc(const IntArray1D& array, mg_in
   } else {
     return hi - 1;
   }
-  /*
-  for (mg_int l = 0; l < array.length - 1; ++l) {
-    if (array.data[l] <= eid && array.data[l+1] > eid) {
-      return l;
-    }
-  }*/
 }
 
-template <typename VFrame,
-          typename EFrame,
+template <typename GData,
           typename Functor>
 __global__ void CUDAAdvanceKernel(
     Csr csr,  // pass by value to make sure it is copied to device memory
-    VFrame vframe,
-    EFrame eframe,
+    GData* gdata,
     IntArray1D input_frontier,
     IntArray1D output_frontier) {
   mg_int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -47,8 +39,8 @@ __global__ void CUDAAdvanceKernel(
   while (eid < csr.column_indices.length) {
     mg_int src = BinarySearchSrc(csr.row_offsets, eid);
     mg_int dst = csr.column_indices.data[eid];
-    if (Functor::CondEdge(src, dst, eid, vframe, eframe)) {
-      Functor::ApplyEdge(src, dst, eid, vframe, eframe);
+    if (Functor::CondEdge(src, dst, eid, gdata)) {
+      Functor::ApplyEdge(src, dst, eid, gdata);
       // Add dst/eid to output frontier
     } else {
       // Add invalid to output frontier
@@ -57,17 +49,14 @@ __global__ void CUDAAdvanceKernel(
   }
 };
 
-
-template <typename VFrame,
-          typename EFrame,
+template <typename GData,
           typename Functor,
           typename Alloc>
-struct DispatchXPU<kDLGPU, VFrame, EFrame, Functor, Alloc> {
+struct DispatchXPU<kDLGPU, GData, Functor, Alloc> {
   static void Advance(
       const RuntimeConfig& config,
       const Csr& csr,
-      VFrame vframe,
-      EFrame eframe,
+      GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
       const Alloc& alloc) {
@@ -75,9 +64,9 @@ struct DispatchXPU<kDLGPU, VFrame, EFrame, Functor, Alloc> {
     int NUM_THREADS = 1024;
     int num_blocks = (csr.column_indices.length + NUM_THREADS-1) / NUM_THREADS;
     LOG(INFO) << "num_blocks: " << num_blocks;
-    CUDAAdvanceKernel<VFrame, EFrame, Functor>
+    CUDAAdvanceKernel<GData, Functor>
       <<<num_blocks, NUM_THREADS, 0, config.stream>>>(
-        csr, vframe, eframe, input_frontier, output_frontier);
+        csr, gdata, input_frontier, output_frontier);
   }
 };
 
