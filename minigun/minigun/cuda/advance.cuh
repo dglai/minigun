@@ -1,8 +1,9 @@
 #ifndef MINIGUN_CUDA_ADVANCE_CUH_
 #define MINIGUN_CUDA_ADVANCE_CUH_
 
-#include "./cuda_common.h"
 #include "../advance.h"
+#include "./cuda_common.h"
+#include "./tuning.h"
 
 namespace minigun {
 namespace advance {
@@ -33,9 +34,9 @@ __global__ void CUDAAdvanceKernel(
     GData* gdata,
     IntArray1D input_frontier,
     IntArray1D output_frontier) {
-  mg_int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  mg_int stride = blockDim.x * gridDim.x;
-  mg_int eid = tid;
+  mg_int ty = blockIdx.y * blockDim.y + threadIdx.y;
+  mg_int stride_y = blockDim.y * gridDim.y;
+  mg_int eid = ty;
   while (eid < csr.column_indices.length) {
     mg_int src = BinarySearchSrc(csr.row_offsets, eid);
     mg_int dst = csr.column_indices.data[eid];
@@ -45,7 +46,7 @@ __global__ void CUDAAdvanceKernel(
     } else {
       // Add invalid to output frontier
     }
-    eid += stride;
+    eid += stride_y;
   }
 };
 
@@ -54,18 +55,23 @@ template <typename GData,
           typename Alloc>
 struct DispatchXPU<kDLGPU, GData, Functor, Alloc> {
   static void Advance(
-      const RuntimeConfig& config,
+      const RuntimeConfig& rtcfg,
       const Csr& csr,
       GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
       const Alloc& alloc) {
     //CHECK(output_frontier.length != 0);
-    int NUM_THREADS = 1024;
-    int num_blocks = (csr.column_indices.length + NUM_THREADS-1) / NUM_THREADS;
-    LOG(INFO) << "num_blocks: " << num_blocks;
+    CHECK_GT(rtcfg.data_num_blocks, 0);
+    CHECK_GT(rtcfg.data_num_threads, 0);
+    KernelConfig kcfg;
+    TuneKernelConfig(rtcfg, csr, input_frontier, output_frontier, &kcfg);
+    dim3 nblks(rtcfg.data_num_blocks, kcfg.by);
+    dim3 nthrs(rtcfg.data_num_threads, kcfg.ty);
+    LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+      << nthrs.x << "," << nthrs.y << ")";
     CUDAAdvanceKernel<GData, Functor>
-      <<<num_blocks, NUM_THREADS, 0, config.stream>>>(
+      <<<nblks, nthrs, 0, rtcfg.stream>>>(
         csr, gdata, input_frontier, output_frontier);
   }
 };

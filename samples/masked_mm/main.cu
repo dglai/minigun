@@ -1,4 +1,4 @@
-/* Sample code for Sparse-Matrix-Vector multiplication.*/
+/* Sample code for Dense-Dense => Sparse Matrix multiplication.*/
 #include <iostream>
 #include <cstdlib>
 #include <time.h>
@@ -8,32 +8,43 @@
 #include "../samples_utils.h"
 
 struct GData {
-  float* cur{nullptr};
-  float* next{nullptr};
-  float* weight{nullptr};
+  mg_int dim = 0;
+  float* ndata{nullptr};
+  float* edata{nullptr};
 };
 
-struct SPMVFunctor {
+struct MaskedMMFunctor {
   static __device__ __forceinline__ bool CondEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    atomicAdd(gdata->next + dst, gdata->cur[src] * gdata->weight[eid]);
+    // only one block along the data dim
+    mg_int tx = threadIdx.x;
+    const mg_int dim = gdata->dim;
+    float sum = 0.;
+    while (tx < dim) {
+      sum += gdata->ndata[src * dim + tx] * gdata->ndata[dst * dim + tx];
+      tx += blockDim.x;
+    }
+    atomicAdd(gdata->edata + eid, sum);
   }
 };
+
+const mg_int D = 128;  // number of features
 
 std::vector<float> GroundTruth(
     const std::vector<mg_int>& row_offsets,
     const std::vector<mg_int>& column_indices,
-    const std::vector<float>& vdata,
-    const std::vector<float>& edata) {
-  std::vector<float> ret(vdata.size(), 0);
+    const std::vector<float>& vdata) {
+  std::vector<float> ret(column_indices.size(), 0);
   for (size_t u = 0; u < row_offsets.size() - 1; ++u) {
     for (mg_int eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
       mg_int v = column_indices[eid];
-      ret[v] += vdata[u] * edata[eid];
+      for (mg_int idx = 0; idx < D; ++idx) {
+        ret[eid] += vdata[u * D + idx] * vdata[v * D + idx];
+      }
     }
   }
   return ret;
@@ -41,12 +52,16 @@ std::vector<float> GroundTruth(
 
 int main(int argc, char** argv) {
   srand(42);
+
+  // create graph
   std::vector<mg_int> row_offsets, column_indices;
   utils::CreateNPGraph(1000, 0.01, row_offsets, column_indices);
   const mg_int N = row_offsets.size() - 1;
   const mg_int M = column_indices.size();
-  std::cout << "#nodes: " << N << " #edges: " << M << std::endl;
+  std::cout << "#nodes: " << N << " #edges: " << M
+    << " #feats: " << D << std::endl;
 
+  // copy graph to gpu
   CUDA_CALL(cudaSetDevice(0));
   minigun::Csr csr;
   minigun::IntArray1D infront, outfront;
@@ -61,26 +76,26 @@ int main(int argc, char** argv) {
 
   // Create stream
   minigun::advance::RuntimeConfig config;
+  config.data_num_threads = utils::_FindNumThreads(D, 32);
   config.data_num_blocks = 1;
-  config.data_num_threads = 1;
   CUDA_CALL(cudaStreamCreate(&config.stream));
 
-  // Create vdata, edata and copy to GPU
-  std::vector<float> vvec(N), evec(M);
-  for (mg_int i = 0; i < N; ++i) {
+  // Create feature data
+  std::vector<float> vvec(N * D), evec(M);
+  for (mg_int i = 0; i < N * D; ++i) {
     vvec[i] = (float)rand() / RAND_MAX;
   }
   for (mg_int i = 0; i < M; ++i) {
-    evec[i] = (float)rand() / RAND_MAX;
+    evec[i] = 0.;
   }
 
+  // Copy feature data to gpu
   GData gdata;
-  CUDA_CALL(cudaMalloc(&gdata.cur, sizeof(float) * N));
-  CUDA_CALL(cudaMemcpy(gdata.cur, &vvec[0], sizeof(float) * N, cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMalloc(&gdata.next, sizeof(float) * N));
-  CUDA_CALL(cudaMemset(gdata.next, 0, sizeof(float) * N));
-  CUDA_CALL(cudaMalloc(&gdata.weight, sizeof(float) * M));
-  CUDA_CALL(cudaMemcpy(gdata.weight, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
+  gdata.dim = D;
+  CUDA_CALL(cudaMalloc(&gdata.ndata, sizeof(float) * N * D));
+  CUDA_CALL(cudaMemcpy(gdata.ndata, &vvec[0], sizeof(float) * N * D, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&gdata.edata, sizeof(float) * M));
+  CUDA_CALL(cudaMemcpy(gdata.edata, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
   GData* d_gdata;
   CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData)));
   CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData), cudaMemcpyHostToDevice));
@@ -88,18 +103,17 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaDeviceSynchronize());
 
   // Compute ground truth
-  std::vector<float> truth = GroundTruth(row_offsets, column_indices,
-      vvec, evec);
+  std::vector<float> truth = GroundTruth(row_offsets, column_indices, vvec);
   //utils::VecPrint(truth);
 
-  minigun::advance::Advance<GData, SPMVFunctor>(
+  minigun::advance::Advance<GData, MaskedMMFunctor>(
       config, csr, d_gdata, infront, outfront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 
   // verify output
-  std::vector<float> rst(N);
-  CUDA_CALL(cudaMemcpy(&rst[0], gdata.next, sizeof(float) * N, cudaMemcpyDeviceToHost));
+  std::vector<float> rst(M);
+  CUDA_CALL(cudaMemcpy(&rst[0], gdata.edata, sizeof(float) * M, cudaMemcpyDeviceToHost));
   //utils::VecPrint(rst);
 
   std::cout << "Correct? " << utils::VecEqual(truth, rst) << std::endl;

@@ -10,7 +10,19 @@
 namespace minigun {
 namespace advance {
 
+enum AdvanceAlg {
+  kAuto = 0,  // auto-tuning
+  kAllEdges,
+  kLoadBalance,
+  kTWC,
+};
+
 struct RuntimeConfig {
+  AdvanceAlg alg = kAuto;
+  // number of thread blocks to process data dimension
+  int data_num_blocks = 0;
+  // number of threads per block to process data dimension
+  int data_num_threads = 0;
 #ifdef MINIGUN_USE_CUDA
   cudaStream_t stream{nullptr};
 #endif  // MINIGUN_USE_CUDA
