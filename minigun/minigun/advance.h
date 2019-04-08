@@ -13,7 +13,8 @@ namespace advance {
 
 enum AdvanceAlg {
   kAuto = 0,  // auto-tuning
-  kLoadBalance,
+  // Gunrock's LB policy: parallelize by output frontiers
+  kGunrockLBOut,
   kTWC,
 };
 
@@ -28,13 +29,24 @@ struct RuntimeConfig {
 #endif  // MINIGUN_USE_CUDA
 };
 
+// Different frontier mode
+enum FrontierMode {
+  kV2N = 0,  // in front contains vids, no out front
+  kV2E,      // in front contains vids, out front contains eids
+  kV2V,      // in front contains vids, out front contains vids
+  kE2N,      // in front contains eids, no out front
+  kE2E,      // in front contains eids, out front contains eids
+  kE2V,      // in front contains eids, out front contains vids
+};
+
+// Static config of advance kernel
 template <bool ADVANCE_ALL,
-          bool REQUIRE_OUT_FRONT>
+          FrontierMode MODE>
 struct Config {
   // if true, the advance is applied on all the nodes
   static const bool kAdvanceAll = ADVANCE_ALL;
-  // if true, the kernel needs to generate output froniter
-  static const bool kRequireOutFront = REQUIRE_OUT_FRONT;
+  // frontier mode
+  static const FrontierMode kMode = MODE;
 };
 
 template <int XPU,

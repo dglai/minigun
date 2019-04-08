@@ -234,7 +234,10 @@ if(USE_CUDA)
   minigun_select_nvcc_arch_flags(NVCC_FLAGS_ARCH)
   string(REPLACE ";" " " NVCC_FLAGS_ARCH "${NVCC_FLAGS_ARCH}")
   set(CMAKE_CUDA_FLAGS "${NVCC_FLAGS_ARCH}")
+  # for lambda support in moderngpu
   set(CUDA_NVCC_FLAGS "--expt-extended-lambda ${CUDA_NVCC_FLAGS}")
+  # suppress deprecated warning in moderngpu
+  set(CUDA_NVCC_FLAGS "-Wno-deprecated-declarations ${CUDA_NVCC_FLAGS}")
 
   list(APPEND MINIGUN_LINKER_LIBS ${CUDA_CUDA_LIBRARY} ${CUDA_CUDART_LIBRARY})
   #list(APPEND DGL_RUNTIME_LINKER_LIBS ${CUDA_CUDART_LIBRARY})
