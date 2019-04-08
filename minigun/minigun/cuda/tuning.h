@@ -15,7 +15,8 @@ struct KernelConfig {
   int by, ty;
 };
 
-__inline__ void TuneKernelConfig(
+template <typename Config>
+void TuneKernelConfig(
     const RuntimeConfig& rtcfg,
     const Csr& csr,
     const IntArray1D& input_frontier,
@@ -25,10 +26,10 @@ __inline__ void TuneKernelConfig(
   if (rtcfg.alg != kAuto) {
     kcfg->alg = rtcfg.alg;
   }
-  kcfg->alg = kAllEdges; // XXX: only one kernel right now.
+  kcfg->alg = kLoadBalance; // XXX: only one kernel right now.
 
   // second, find the kernel config for each algorithm
-  if (kcfg->alg == kAllEdges) {
+  if (kcfg->alg == kLoadBalance && Config::kAdvanceAll) {
     const mg_int M = csr.column_indices.length;
     kcfg->ty = MAX_BLOCK_NTHREADS / rtcfg.data_num_threads;
     const int ny = kcfg->ty * PER_THREAD_WORKLOAD;

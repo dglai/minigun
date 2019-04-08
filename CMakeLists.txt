@@ -20,6 +20,7 @@ dgl_option(USE_CUDA "Build with CUDA" ON)
 include_directories("minigun")
 include_directories("third_party/dlpack/include")
 include_directories("third_party/dmlc-core/include")
+include_directories("third_party/moderngpu/src")
 
 set(MINIGUN_LINKER_LIBS "")
 

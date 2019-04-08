@@ -3,6 +3,7 @@
 
 #include "./base.h"
 #include "./csr.h"
+#include "./mem.h"
 #ifdef MINIGUN_USE_CUDA
 #include <cuda_runtime.h>
 #endif  // MINIGUN_USE_CUDA
@@ -12,7 +13,6 @@ namespace advance {
 
 enum AdvanceAlg {
   kAuto = 0,  // auto-tuning
-  kAllEdges,
   kLoadBalance,
   kTWC,
 };
@@ -28,11 +28,17 @@ struct RuntimeConfig {
 #endif  // MINIGUN_USE_CUDA
 };
 
-struct DefaultAllocator {
-  // TODO
+template <bool ADVANCE_ALL,
+          bool REQUIRE_OUT_FRONT>
+struct Config {
+  // if true, the advance is applied on all the nodes
+  static const bool kAdvanceAll = ADVANCE_ALL;
+  // if true, the kernel needs to generate output froniter
+  static const bool kRequireOutFront = REQUIRE_OUT_FRONT;
 };
 
 template <int XPU,
+          typename Config,
           typename GData,
           typename Functor,
           typename Alloc>
@@ -43,21 +49,27 @@ struct DispatchXPU {
       GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
-      const Alloc& alloc) {
+      Alloc alloc) {
     LOG(FATAL) << "Not implemented for XPU: " << XPU;
   }
 };
 
-template <typename GData,
+
+/*
+ * !\brief Advance kernel.
+ */
+template <int XPU,
+          typename Config,
+          typename GData,
           typename Functor,
-          typename Alloc = DefaultAllocator>
+          typename Alloc = DefaultAllocator<XPU> >
 void Advance(const RuntimeConfig& config,
              const Csr& csr,
              GData* gdata,
              IntArray1D input_frontier,
              IntArray1D output_frontier,
-             const Alloc& alloc = Alloc()) {
-  DispatchXPU<kDLGPU, GData, Functor, Alloc>::Advance(
+             Alloc alloc = Alloc()) {
+  DispatchXPU<XPU, Config, GData, Functor, Alloc>::Advance(
       config, csr, gdata,
       input_frontier, output_frontier, alloc);
 }
