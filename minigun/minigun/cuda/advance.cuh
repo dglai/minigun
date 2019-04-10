@@ -5,61 +5,12 @@
 #include <moderngpu/transform.hxx>
 
 #include "../advance.h"
+#include "./advance_all.cuh"
 #include "./cuda_common.h"
 #include "./tuning.h"
 
 namespace minigun {
 namespace advance {
-
-// Binary search the row_offsets to find the source node of the edge id.
-__device__ __forceinline__ mg_int BinarySearchSrc(const IntArray1D& array, mg_int eid) {
-  mg_int lo = 0, hi = array.length - 1;
-  while (lo < hi) {
-    mg_int mid = (lo + hi) >> 1;
-    if (array.data[mid] < eid) {
-      lo = mid + 1;
-    } else {
-      hi = mid;
-    }
-  }
-  // INVARIANT: lo == hi
-  if (array.data[hi] == eid) {
-    return hi;
-  } else {
-    return hi - 1;
-  }
-}
-
-template <typename Config,
-          typename GData,
-          typename Functor>
-__global__ void CUDAAdvanceAllKernel(
-    Csr csr,  // pass by value to make sure it is copied to device memory
-    GData* gdata,
-    IntArray1D output_frontier) {
-  mg_int ty = blockIdx.y * blockDim.y + threadIdx.y;
-  mg_int stride_y = blockDim.y * gridDim.y;
-  mg_int eid = ty;
-  while (eid < csr.column_indices.length) {
-    mg_int src = BinarySearchSrc(csr.row_offsets, eid);
-    mg_int dst = csr.column_indices.data[eid];
-    if (Functor::CondEdge(src, dst, eid, gdata)) {
-      Functor::ApplyEdge(src, dst, eid, gdata);
-      // Add dst/eid to output frontier
-      if (Config::kMode == kV2V || Config::kMode == kE2V) {
-        output_frontier.data[eid] = dst;
-      } else if (Config::kMode == kV2E || Config::kMode == kE2E) {
-        output_frontier.data[eid] = eid;
-      }
-    } else {
-      if (Config::kMode != kV2N && Config::kMode != kE2N) {
-        // Add invalid to output frontier
-        output_frontier.data[eid] = kInvalid;
-      }
-    }
-    eid += stride_y;
-  }
-};
 
 __inline__ void ComputeEdgeCounts(
     MgpuContext& mgpuctx,
@@ -95,6 +46,11 @@ __inline__ void ComputeOutputLength(
   LOG(INFO) << "Output frontier length: " << *outlen;
 }
 
+__inline__ void ComputeOutputOffset(
+    MgpuContext& mgpuctx,
+    ) {
+}
+
 template <typename Config,
           typename GData,
           typename Functor,
@@ -127,17 +83,17 @@ struct DispatchXPU<kDLGPU, Config, GData, Functor, Alloc> {
             output_frontier.length * sizeof(mg_int));
       }
     } else {
-      edge_counts.length = input_frontier.length;
-      edge_counts.data = alloc.template AllocateWorkspace<mg_int>(
-          edge_counts.length * sizeof(mg_int));
-      ComputeEdgeCounts(mgpuctx, csr, input_frontier, &edge_counts);
-      lcl_row_offsets.length = input_frontier.length + 1;
-      lcl_row_offsets.data = alloc.template AllocateWorkspace<mg_int>(
-          lcl_row_offsets.length * sizeof(mg_int));
-      ComputeOutputLength(mgpuctx,
-          csr, edge_counts, &lcl_row_offsets, &output_frontier.length);
       if (Config::kMode != kV2N && Config::kMode != kE2N
           && output_frontier.data == nullptr) {
+        edge_counts.length = input_frontier.length;
+        edge_counts.data = alloc.template AllocateWorkspace<mg_int>(
+            edge_counts.length * sizeof(mg_int));
+        ComputeEdgeCounts(mgpuctx, csr, input_frontier, &edge_counts);
+        lcl_row_offsets.length = input_frontier.length + 1;
+        lcl_row_offsets.data = alloc.template AllocateWorkspace<mg_int>(
+            lcl_row_offsets.length * sizeof(mg_int));
+        ComputeOutputLength(mgpuctx,
+            csr, edge_counts, &lcl_row_offsets, &output_frontier.length);
         // The output frontier buffer should be allocated.
         output_frontier.data = alloc.template AllocateData<mg_int>(
             output_frontier.length * sizeof(mg_int));
@@ -155,6 +111,7 @@ struct DispatchXPU<kDLGPU, Config, GData, Functor, Alloc> {
       << nthrs.x << "," << nthrs.y << ")";
 
     if (Config::kAdvanceAll) {
+      AdvanceAlg algo = FindAlgo<Config>(rtcfg, csr, input_frontier, output_frontier, &kcfg);
       CUDAAdvanceAllKernel<Config, GData, Functor>
         <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, gdata, output_frontier);
     } else {
@@ -163,6 +120,9 @@ struct DispatchXPU<kDLGPU, Config, GData, Functor, Alloc> {
 
     if (edge_counts.data) {
       alloc.FreeWorkspace(edge_counts.data);
+    }
+    if (lcl_row_offsets.data) {
+      alloc.FreeWorkspace(lcl_row_offsets.data);
     }
   }
 };
