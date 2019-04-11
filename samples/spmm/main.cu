@@ -109,7 +109,8 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
 
-  minigun::advance::Advance<GData, SPMMFunctor>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  minigun::advance::Advance<kDLGPU, Config, GData, SPMMFunctor>(
       config, csr, d_gdata, infront, outfront);
 
   CUDA_CALL(cudaDeviceSynchronize());

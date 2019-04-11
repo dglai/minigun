@@ -170,11 +170,12 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, evec);
   //utils::VecPrint(truth);
 
-  minigun::advance::Advance<GData, EdgeMax>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  minigun::advance::Advance<kDLGPU, Config, GData, EdgeMax>(
       config, csr, d_gdata, infront, outfront);
-  minigun::advance::Advance<GData, MinuxMaxExpSum>(
+  minigun::advance::Advance<kDLGPU, Config, GData, MinuxMaxExpSum>(
       config, csr, d_gdata, infront, outfront);
-  minigun::advance::Advance<GData, Norm>(
+  minigun::advance::Advance<kDLGPU, Config, GData, Norm>(
       config, csr, d_gdata, infront, outfront);
 
   CUDA_CALL(cudaDeviceSynchronize());
