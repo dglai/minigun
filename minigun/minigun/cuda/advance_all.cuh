@@ -4,12 +4,9 @@
 namespace minigun {
 namespace advance {
 
-template <typename Config,
-          typename GData,
-          typename Functor,
-          typename Alloc>
-struct DispatchAlgoAdvanceAllExecutor {
-};
+#define MAX_BLOCK_NTHREADS 1024
+#define PER_THREAD_WORKLOAD 1
+#define MAX_NBLOCKS 65535L
 
 // Binary search the row_offsets to find the source node of the edge id.
 __device__ __forceinline__ mg_int BinarySearchSrc(const IntArray1D& array, mg_int eid) {
@@ -33,7 +30,7 @@ __device__ __forceinline__ mg_int BinarySearchSrc(const IntArray1D& array, mg_in
 template <typename Config,
           typename GData,
           typename Functor>
-__global__ void CUDAAdvanceAllKernel(
+__global__ void CudaAdvanceAllGunrockLBOutKernel(
     Csr csr,  // pass by value to make sure it is copied to device memory
     GData* gdata,
     IntArray1D output_frontier) {
@@ -62,6 +59,53 @@ __global__ void CUDAAdvanceAllKernel(
     eid += stride_y;
   }
 };
+
+template <typename Config,
+          typename GData,
+          typename Functor,
+          typename Alloc>
+void CudaAdvanceAllGunrockLBOut(
+    const RuntimeConfig& rtcfg,
+    const Csr& csr,
+    GData* gdata,
+    IntArray1D output_frontier) {
+  CHECK_GT(rtcfg.data_num_blocks, 0);
+  CHECK_GT(rtcfg.data_num_threads, 0);
+  const mg_int M = csr.column_indices.length;
+  const int ty = MAX_BLOCK_NTHREADS / rtcfg.data_num_threads;
+  const int ny = ty * PER_THREAD_WORKLOAD;
+  const int by = std::min((M + ny - 1) / ny, MAX_NBLOCKS);
+  const dim3 nblks(rtcfg.data_num_blocks, by);
+  const dim3 nthrs(rtcfg.data_num_threads, ty);
+  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+    << nthrs.x << "," << nthrs.y << ")";
+  CudaAdvanceAllGunrockLBOutKernel<Config, GData, Functor>
+    <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, gdata, output_frontier);
+}
+
+template <typename Config,
+          typename GData,
+          typename Functor,
+          typename Alloc>
+void CudaAdvanceAll(
+    AdvanceAlg algo,
+    const RuntimeConfig& rtcfg,
+    const Csr& csr,
+    GData* gdata,
+    IntArray1D output_frontier) {
+  switch (algo) {
+    case kGunrockLBOut :
+      CudaAdvanceAllGunrockLBOut<Config, GData, Functor, Alloc>(
+          rtcfg, csr, gdata, output_frontier);
+      break;
+    default:
+      LOG(FATAL) << "Algorithm " << algo << " is not supported.";
+  }
+}
+
+#undef MAX_BLOCK_NTHREADS
+#undef PER_THREAD_WORKLOAD
+#undef MAX_NBLOCKS
 
 }  // namespace advance
 }  // namespace minigun

@@ -46,11 +46,6 @@ __inline__ void ComputeOutputLength(
   LOG(INFO) << "Output frontier length: " << *outlen;
 }
 
-__inline__ void ComputeOutputOffset(
-    MgpuContext& mgpuctx,
-    ) {
-}
-
 template <typename Config,
           typename GData,
           typename Functor,
@@ -101,20 +96,13 @@ struct DispatchXPU<kDLGPU, Config, GData, Functor, Alloc> {
     }
 
     // Call advance
-    CHECK_GT(rtcfg.data_num_blocks, 0);
-    CHECK_GT(rtcfg.data_num_threads, 0);
-    KernelConfig kcfg;
-    TuneKernelConfig<Config>(rtcfg, csr, input_frontier, output_frontier, &kcfg);
-    const dim3 nblks(rtcfg.data_num_blocks, kcfg.by);
-    const dim3 nthrs(rtcfg.data_num_threads, kcfg.ty);
-    LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-      << nthrs.x << "," << nthrs.y << ")";
-
     if (Config::kAdvanceAll) {
-      AdvanceAlg algo = FindAlgo<Config>(rtcfg, csr, input_frontier, output_frontier, &kcfg);
-      CUDAAdvanceAllKernel<Config, GData, Functor>
-        <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, gdata, output_frontier);
+      AdvanceAlg algo = FindAdvanceAllAlgo<Config>(rtcfg, csr);
+      CudaAdvanceAll<Config, GData, Functor, Alloc>(
+          algo, rtcfg, csr, gdata, output_frontier);
     } else {
+      AdvanceAlg algo = FindAdvanceAlgo<Config>(rtcfg, csr,
+          input_frontier, output_frontier);
       LOG(FATAL) << "!!!";
     }
 
