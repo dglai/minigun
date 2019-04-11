@@ -56,9 +56,9 @@ endif(MSVC)
 
 include(cmake/modules/CUDA.cmake)
 
-if(USE_CUDA)
-  project(minigun-samples C CXX CUDA)
-endif()
+#if(USE_CUDA)
+#  project(minigun-samples C CXX CUDA)
+#endif()
 
 file(GLOB_RECURSE MINIGUN_SRC "minigun/minigun/*.h")
 
