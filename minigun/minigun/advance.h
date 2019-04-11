@@ -7,6 +7,13 @@
 #include <cuda_runtime.h>
 #endif  // MINIGUN_USE_CUDA
 
+#define AT_CASE_DEV_TYPE(dev_type)                                      \
+  case dev_type: {                                                      \
+    DispatchXPU<dev_type, GData, Functor, Alloc>::Advance(              \
+        config, csr, gdata, input_frontier, output_frontier, alloc);    \
+    break;                                                              \
+  }
+
 namespace minigun {
 namespace advance {
 
@@ -57,9 +64,11 @@ void Advance(const RuntimeConfig& config,
              IntArray1D input_frontier,
              IntArray1D output_frontier,
              const Alloc& alloc = Alloc()) {
-  DispatchXPU<kDLGPU, GData, Functor, Alloc>::Advance(
-      config, csr, gdata,
-      input_frontier, output_frontier, alloc);
+  switch (csr.ctx.device_type) {
+    AT_CASE_DEV_TYPE(kDLCPU)
+    default:
+      LOG(FATAL) << "Device type not supported: " << csr.ctx.device_type;
+  }
 }
 
 }  // namespace advance
@@ -68,5 +77,6 @@ void Advance(const RuntimeConfig& config,
 #ifdef MINIGUN_USE_CUDA
 #include "./cuda/advance.cuh"
 #endif
+#include "./cpu/advance.h"
 
 #endif  // MINIGUN_ADVANCE_H_
