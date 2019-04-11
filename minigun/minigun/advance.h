@@ -3,6 +3,7 @@
 
 #include "./base.h"
 #include "./csr.h"
+#include "./mem.h"
 #ifdef MINIGUN_USE_CUDA
 #include <cuda_runtime.h>
 #endif  // MINIGUN_USE_CUDA
@@ -12,8 +13,8 @@ namespace advance {
 
 enum AdvanceAlg {
   kAuto = 0,  // auto-tuning
-  kAllEdges,
-  kLoadBalance,
+  // Gunrock's LB policy: parallelize by output frontiers
+  kGunrockLBOut,
   kTWC,
 };
 
@@ -28,11 +29,28 @@ struct RuntimeConfig {
 #endif  // MINIGUN_USE_CUDA
 };
 
-struct DefaultAllocator {
-  // TODO
+// Different frontier mode
+enum FrontierMode {
+  kV2N = 0,  // in front contains vids, no out front
+  kV2E,      // in front contains vids, out front contains eids
+  kV2V,      // in front contains vids, out front contains vids
+  kE2N,      // in front contains eids, no out front
+  kE2E,      // in front contains eids, out front contains eids
+  kE2V,      // in front contains eids, out front contains vids
+};
+
+// Static config of advance kernel
+template <bool ADVANCE_ALL,
+          FrontierMode MODE>
+struct Config {
+  // if true, the advance is applied on all the nodes
+  static const bool kAdvanceAll = ADVANCE_ALL;
+  // frontier mode
+  static const FrontierMode kMode = MODE;
 };
 
 template <int XPU,
+          typename Config,
           typename GData,
           typename Functor,
           typename Alloc>
@@ -43,21 +61,27 @@ struct DispatchXPU {
       GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
-      const Alloc& alloc) {
+      Alloc alloc) {
     LOG(FATAL) << "Not implemented for XPU: " << XPU;
   }
 };
 
-template <typename GData,
+
+/*
+ * !\brief Advance kernel.
+ */
+template <int XPU,
+          typename Config,
+          typename GData,
           typename Functor,
-          typename Alloc = DefaultAllocator>
+          typename Alloc = DefaultAllocator<XPU> >
 void Advance(const RuntimeConfig& config,
              const Csr& csr,
              GData* gdata,
              IntArray1D input_frontier,
              IntArray1D output_frontier,
-             const Alloc& alloc = Alloc()) {
-  DispatchXPU<kDLGPU, GData, Functor, Alloc>::Advance(
+             Alloc alloc = Alloc()) {
+  DispatchXPU<XPU, Config, GData, Functor, Alloc>::Advance(
       config, csr, gdata,
       input_frontier, output_frontier, alloc);
 }

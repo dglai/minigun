@@ -20,6 +20,7 @@ dgl_option(USE_CUDA "Build with CUDA" ON)
 include_directories("minigun")
 include_directories("third_party/dlpack/include")
 include_directories("third_party/dmlc-core/include")
+include_directories("third_party/moderngpu/src")
 
 set(MINIGUN_LINKER_LIBS "")
 
@@ -55,9 +56,9 @@ endif(MSVC)
 
 include(cmake/modules/CUDA.cmake)
 
-if(USE_CUDA)
-  project(minigun-samples C CXX CUDA)
-endif()
+#if(USE_CUDA)
+#  project(minigun-samples C CXX CUDA)
+#endif()
 
 file(GLOB_RECURSE MINIGUN_SRC "minigun/minigun/*.h")
 
