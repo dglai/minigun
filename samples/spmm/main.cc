@@ -2,7 +2,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <time.h>
-#include <cuda_runtime.h>
+#include <omp.h>
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
@@ -15,18 +15,17 @@ struct GData {
 };
 
 struct SPMMFunctor {
-  static __device__ __forceinline__ bool CondEdge(
+  static inline bool CondEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
     return true;
   }
-  static __device__ __forceinline__ void ApplyEdge(
+  static inline void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    mg_int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    mg_int stride_x = blockDim.x * gridDim.x;
-    while (tx < gdata->dim) {
-      atomicAdd(gdata->next + dst * gdata->dim + tx,
-                gdata->cur[src * gdata->dim + tx] * gdata->weight[eid]);
-      tx += stride_x;
+#pragma omp parallel for
+    for (mg_int fid = 0; fid < gdata->dim; ++fid) {
+#pragma omp atomic
+      gdata->next[dst * gdata->dim + fid] += gdata->cur[src * gdata->dim + fid] *
+        gdata->weight[eid];
     }
   }
 };
@@ -62,25 +61,16 @@ int main(int argc, char** argv) {
     << " #feats: " << D << std::endl;
 
   // copy graph to gpu
-  CUDA_CALL(cudaSetDevice(0));
   minigun::Csr csr;
-  csr.ctx.device_type = kDLGPU;
+  csr.ctx.device_type = kDLCPU;
   minigun::IntArray1D infront, outfront;
   csr.row_offsets.length = row_offsets.size();
-  CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(mg_int) * row_offsets.size()));
-  CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &row_offsets[0],
-        sizeof(mg_int) * row_offsets.size(), cudaMemcpyHostToDevice));
+  csr.row_offsets.data = &row_offsets[0];
   csr.column_indices.length = column_indices.size();
-  CUDA_CALL(cudaMalloc(&csr.column_indices.data, sizeof(mg_int) * column_indices.size()));
-  CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
-        sizeof(mg_int) * column_indices.size(), cudaMemcpyHostToDevice));
+  csr.column_indices.data = &column_indices[0];
 
-  // Create stream
+  // Create Runtime Config, not used for cpu
   minigun::advance::RuntimeConfig config;
-  int nt = utils::_FindNumThreads(D, 32);
-  config.data_num_threads = nt;
-  config.data_num_blocks = (M + nt - 1) / nt;
-  CUDA_CALL(cudaStreamCreate(&config.stream));
 
   // Create feature data
   std::vector<float> vvec(N * D), evec(M);
@@ -94,34 +84,20 @@ int main(int argc, char** argv) {
   // Copy feature data to gpu
   GData gdata;
   gdata.dim = D;
-  CUDA_CALL(cudaMalloc(&gdata.cur, sizeof(float) * N * D));
-  CUDA_CALL(cudaMemcpy(gdata.cur, &vvec[0], sizeof(float) * N * D, cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMalloc(&gdata.next, sizeof(float) * N * D));
-  CUDA_CALL(cudaMemset(gdata.next, 0, sizeof(float) * N * D));
-  CUDA_CALL(cudaMalloc(&gdata.weight, sizeof(float) * M));
-  CUDA_CALL(cudaMemcpy(gdata.weight, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
-  GData* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData), cudaMemcpyHostToDevice));
-
-  CUDA_CALL(cudaDeviceSynchronize());
+  std::vector<float> results(N * D);
+  gdata.cur = &vvec[0];
+  gdata.next = &results[0];
+  gdata.weight = &evec[0];
 
   // Compute ground truth
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
 
   minigun::advance::Advance<GData, SPMMFunctor>(
-      config, csr, d_gdata, infront, outfront);
-
-  CUDA_CALL(cudaDeviceSynchronize());
+      config, csr, &gdata, infront, outfront);
 
   // verify output
-  std::vector<float> rst(N * D);
-  CUDA_CALL(cudaMemcpy(&rst[0], gdata.next, sizeof(float) * N * D, cudaMemcpyDeviceToHost));
-
-  std::cout << "Correct? " << utils::VecEqual(truth, rst) << std::endl;
-
-  // free
+  std::cout << "Correct? " << utils::VecEqual(truth, results) << std::endl;
 
   return 0;
 }
