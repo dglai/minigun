@@ -43,10 +43,11 @@ __global__ void CUDAAdvanceLBKernel(
     // INVARIANT: (part_end - part_start) <= blockDim.y
     const mg_int in_item = part_start + threadIdx.y;
     if (in_item < part_end) {
-      s_lcl_row_offsets[threadIdx.y] = lcl_row_offsets[in_item];
+      s_lcl_row_offsets[threadIdx.y] = lcl_row_offsets.data[in_item];
       const mg_int src = (Config::kMode == kE2V || Config::kMode == kE2E)?
-        csr.column_indices[input_frontier.data[in_item]] : input_frontier.data[in_item];
-      s_glb_row_offsets[threadIdx.y] = csr.row_offsets[src];
+        csr.column_indices.data[input_frontier.data[in_item]] :
+        input_frontier.data[in_item];
+      s_glb_row_offsets[threadIdx.y] = csr.row_offsets.data[src];
       s_lcl2glb_vid[threadIdx.y] = src;
     }
     __syncthreads();
@@ -61,7 +62,7 @@ __global__ void CUDAAdvanceLBKernel(
       // find the index of the current edge w.r.t. its src node
       const mg_int veid = threadIdx.y - (s_lclsrc == 0)? 0 : s_lcl_row_offsets[s_lclsrc - 1];
       const mg_int eid = s_glb_row_offsets[s_lclsrc] + veid;
-      const mg_int dst = csr.column_indices[eid];
+      const mg_int dst = csr.column_indices.data[eid];
       if (Functor::CondEdge(src, dst, eid, gdata)) {
         Functor::ApplyEdge(src, dst, eid, gdata);
         // Add dst/eid to output frontier

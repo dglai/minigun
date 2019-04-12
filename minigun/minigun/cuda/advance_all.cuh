@@ -68,7 +68,8 @@ void CudaAdvanceAllGunrockLBOut(
     const RuntimeConfig& rtcfg,
     const Csr& csr,
     GData* gdata,
-    IntArray1D output_frontier) {
+    IntArray1D output_frontier,
+    Alloc alloc) {
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
   const mg_int M = csr.column_indices.length;
@@ -92,11 +93,20 @@ void CudaAdvanceAll(
     const RuntimeConfig& rtcfg,
     const Csr& csr,
     GData* gdata,
-    IntArray1D output_frontier) {
+    IntArray1D output_frontier,
+    Alloc alloc) {
+  if (Config::kMode != kV2N && Config::kMode != kE2N
+      && output_frontier.data == nullptr) {
+    // Allocate output frointer buffer, the length is equal to the number
+    // of edges.
+    output_frontier.length = csr.column_indices.length;
+    output_frontier.data = alloc.template AllocateData<mg_int>(
+        output_frontier.length * sizeof(mg_int));
+  }
   switch (algo) {
     case kGunrockLBOut :
       CudaAdvanceAllGunrockLBOut<Config, GData, Functor, Alloc>(
-          rtcfg, csr, gdata, output_frontier);
+          rtcfg, csr, gdata, output_frontier, alloc);
       break;
     default:
       LOG(FATAL) << "Algorithm " << algo << " is not supported.";
