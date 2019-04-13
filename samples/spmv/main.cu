@@ -93,7 +93,8 @@ int main(int argc, char** argv) {
       vvec, evec);
   //utils::VecPrint(truth);
 
-  minigun::advance::Advance<GData, SPMVFunctor>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
       config, csr, d_gdata, infront, outfront);
 
   CUDA_CALL(cudaDeviceSynchronize());
