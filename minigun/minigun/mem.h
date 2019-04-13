@@ -3,9 +3,9 @@
 
 #include <dmlc/logging.h>
 
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
 #include "./cuda/cuda_common.h"
-#endif  // MINIGUN_USE_CUDA
+#endif  // __CUDACC__
 
 namespace minigun {
 
@@ -47,7 +47,7 @@ class DefaultAllocator<kDLCPU> {
   }
 };
 
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
 template <>
 class DefaultAllocator<kDLGPU> {
  public:
@@ -70,7 +70,7 @@ class DefaultAllocator<kDLGPU> {
     CUDA_CALL(cudaFree(ptr));
   }
 };
-#endif  // MINIGUN_USE_CUDA
+#endif  // __CUDACC__
 
 }  // namespace minigun
 

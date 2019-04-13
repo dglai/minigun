@@ -63,7 +63,6 @@ int main(int argc, char** argv) {
 
   // copy graph to gpu
   minigun::Csr csr;
-  csr.ctx.device_type = kDLCPU;
   minigun::IntArray1D infront, outfront;
   csr.row_offsets.length = row_offsets.size();
   csr.row_offsets.data = &row_offsets[0];
@@ -92,7 +91,8 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, vvec);
   //utils::VecPrint(truth);
 
-  minigun::advance::Advance<GData, MaskedMMFunctor>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  minigun::advance::Advance<kDLCPU, Config, GData, MaskedMMFunctor>(
       config, csr, &gdata, infront, outfront);
 
   // verify output

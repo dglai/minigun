@@ -60,10 +60,9 @@ struct Norm {
   static inline void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
     const mg_int dim = gdata->dim;
+#pragma omp parallel for
     for (mg_int fid = 0; fid < dim; ++fid) {
-      auto sum = gdata->sum[dst * dim + fid];
-#pragma omp atomic
-      gdata->score[eid * dim + fid] /= sum;
+      gdata->score[eid * dim + fid] /= gdata->sum[dst * dim + fid];
     }
   }
 };
@@ -108,7 +107,6 @@ int main(int argc, char** argv) {
 
   // copy graph to gpu
   minigun::Csr csr;
-  csr.ctx.device_type = kDLCPU;
   minigun::IntArray1D infront, outfront;
   csr.row_offsets.length = row_offsets.size();
   csr.row_offsets.data = &row_offsets[0];
@@ -140,11 +138,12 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, evec);
   //utils::VecPrint(truth);
 
-  minigun::advance::Advance<GData, EdgeMax>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  minigun::advance::Advance<kDLCPU, Config, GData, EdgeMax>(
       config, csr, &gdata, infront, outfront);
-  minigun::advance::Advance<GData, MinuxMaxExpSum>(
+  minigun::advance::Advance<kDLCPU, Config, GData, MinuxMaxExpSum>(
       config, csr, &gdata, infront, outfront);
-  minigun::advance::Advance<GData, Norm>(
+  minigun::advance::Advance<kDLCPU, Config, GData, Norm>(
       config, csr, &gdata, infront, outfront);
 
   // verify output

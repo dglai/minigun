@@ -49,7 +49,6 @@ int main(int argc, char** argv) {
   std::cout << "#nodes: " << N << " #edges: " << M << std::endl;
 
   minigun::Csr csr;
-  csr.ctx.device_type = kDLCPU;
   minigun::IntArray1D infront, outfront;
   csr.row_offsets.length = row_offsets.size();
   csr.row_offsets.data = &row_offsets[0];
@@ -79,7 +78,8 @@ int main(int argc, char** argv) {
       vvec, evec);
   //utils::VecPrint(truth);
 
-  minigun::advance::Advance<GData, SPMVFunctor>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
       config, csr, &gdata, infront, outfront);
 
   // verify output

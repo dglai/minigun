@@ -26,7 +26,8 @@ static inline mg_int CPUBinarySearchSrc(const IntArray1D& array, mg_int eid) {
   }
 }
 
-template <typename GData,
+template <typename Config,
+          typename GData,
           typename Functor>
 void CPUAdvanceKernel(
     Csr csr,  // pass by value to make sure it is copied to device memory
@@ -43,10 +44,11 @@ void CPUAdvanceKernel(
   }
 };
 
-template <typename GData,
+template <typename Config,
+          typename GData,
           typename Functor,
           typename Alloc>
-struct DispatchXPU<kDLCPU, GData, Functor, Alloc> {
+struct DispatchXPU<kDLCPU, Config, GData, Functor, Alloc> {
   static void Advance(
       const RuntimeConfig& rtcfg,
       const Csr& csr,
@@ -55,7 +57,7 @@ struct DispatchXPU<kDLCPU, GData, Functor, Alloc> {
       IntArray1D output_frontier,
       const Alloc& alloc) {
     //CHECK(output_frontier.length != 0);
-    CPUAdvanceKernel<GData, Functor>(csr, gdata, input_frontier, output_frontier);
+    CPUAdvanceKernel<Config, GData, Functor>(csr, gdata, input_frontier, output_frontier);
   }
 };
 

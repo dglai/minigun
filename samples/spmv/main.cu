@@ -49,7 +49,6 @@ int main(int argc, char** argv) {
 
   CUDA_CALL(cudaSetDevice(0));
   minigun::Csr csr;
-  csr.ctx.device_type = kDLGPU;
   minigun::IntArray1D infront, outfront;
   csr.row_offsets.length = row_offsets.size();
   CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(mg_int) * row_offsets.size()));
