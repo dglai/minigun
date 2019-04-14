@@ -28,10 +28,9 @@ std::vector<float> GroundTruth(
     const std::vector<mg_int>& row_offsets,
     const std::vector<mg_int>& column_indices,
     const std::vector<float>& vdata,
-    const std::vector<float>& edata,
-    const std::vector<mg_int>& infront_vec) {
+    const std::vector<float>& edata) {
   std::vector<float> ret(vdata.size(), 0);
-  for (const mg_int u : infront_vec) {
+  for (size_t u = 0; u < row_offsets.size() - 1; ++u) {
     for (mg_int eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
       mg_int v = column_indices[eid];
       ret[v] += vdata[u] * edata[eid];
@@ -50,6 +49,7 @@ int main(int argc, char** argv) {
 
   CUDA_CALL(cudaSetDevice(0));
   minigun::Csr csr;
+  minigun::IntArray1D infront, outfront;
   csr.row_offsets.length = row_offsets.size();
   CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(mg_int) * row_offsets.size()));
   CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &row_offsets[0],
@@ -58,17 +58,6 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMalloc(&csr.column_indices.data, sizeof(mg_int) * column_indices.size()));
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
         sizeof(mg_int) * column_indices.size(), cudaMemcpyHostToDevice));
-
-  // prepare frontiers
-  minigun::IntArray1D infront, outfront;
-  std::vector<mg_int> infront_vec;
-  for (mg_int i = 3; i < 3 + 500; ++i) {
-    infront_vec.push_back(i);
-  }
-  infront.length = infront_vec.size();
-  CUDA_CALL(cudaMalloc(&infront.data, sizeof(mg_int) * infront_vec.size()));
-  CUDA_CALL(cudaMemcpy(infront.data, &infront_vec[0],
-        sizeof(mg_int) * infront_vec.size(), cudaMemcpyHostToDevice));
 
   // Create stream
   minigun::advance::RuntimeConfig config;
@@ -100,12 +89,13 @@ int main(int argc, char** argv) {
 
   // Compute ground truth
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
-      vvec, evec, infront_vec);
+      vvec, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<false, minigun::advance::kV2E> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
-      config, csr, d_gdata, infront, outfront);
+      config, csr, d_gdata, infront, outfront,
+      utils::GPUAllocator::Get());
 
   CUDA_CALL(cudaDeviceSynchronize());
 
@@ -115,6 +105,18 @@ int main(int argc, char** argv) {
   //utils::VecPrint(rst);
 
   std::cout << "Correct? " << utils::VecEqual(truth, rst) << std::endl;
+
+  const int K = 10;
+  timeval t0, t1;
+  gettimeofday(&t0, nullptr);
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
+        config, csr, d_gdata, infront, outfront,
+        utils::GPUAllocator::Get());
+  }
+  CUDA_CALL(cudaDeviceSynchronize());
+  gettimeofday(&t1, nullptr);
+  std::cout << "Time(ms): " << (double)(t1.tv_usec - t0.tv_usec) / K / 1000.0 << std::endl;
 
   // free
 

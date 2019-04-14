@@ -41,7 +41,7 @@ __global__ void dummy_k() { }
 template <typename Alloc>
 class MgpuContext : public mgpu::context_t {
  public:
-  MgpuContext(cudaStream_t stream, Alloc alloc): stream_(stream), alloc_(alloc) {
+  MgpuContext(cudaStream_t stream, Alloc* alloc): stream_(stream), alloc_(alloc) {
     cudaFuncAttributes attr;
     CUDA_CALL(cudaFuncGetAttributes(&attr, dummy_k<0>));
     ptx_version_ = attr.ptxVersion;
@@ -65,11 +65,11 @@ class MgpuContext : public mgpu::context_t {
   }
   void* alloc(size_t size, mgpu::memory_space_t space) override {
     CHECK_EQ(space,  mgpu::memory_space_device);
-    return alloc_.template AllocateWorkspace<void>(size);
+    return alloc_->template AllocateWorkspace<void>(size);
   }
   void free(void* p, mgpu::memory_space_t space) override {
     CHECK_EQ(space,  mgpu::memory_space_device);
-    alloc_.FreeWorkspace(p);
+    alloc_->FreeWorkspace(p);
   }
   void synchronize() override {
     if (stream_) {
@@ -90,7 +90,7 @@ class MgpuContext : public mgpu::context_t {
   }
 
  private:
-  Alloc alloc_;
+  Alloc* alloc_;
   int ptx_version_;
   cudaStream_t stream_;
   cudaEvent_t event_;

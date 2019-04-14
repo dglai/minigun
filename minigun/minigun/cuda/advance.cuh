@@ -60,7 +60,7 @@ class CudaAdvanceExecutor {
       GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
-      Alloc alloc):
+      Alloc* alloc):
     algo_(algo), rtcfg_(rtcfg), csr_(csr), gdata_(gdata),
     input_frontier_(input_frontier), output_frontier_(output_frontier),
     alloc_(alloc) { }
@@ -71,28 +71,28 @@ class CudaAdvanceExecutor {
     // It's length == len(input_frontier) + 1, and
     // lcl_row_offsets[i+1] - lcl_row_offsets[i] == edge_counts[i]
     IntArray1D lcl_row_offsets;
+    lcl_row_offsets.length = input_frontier_.length + 1;
+    lcl_row_offsets.data = alloc_->template AllocateWorkspace<mg_int>(
+        lcl_row_offsets.length * sizeof(mg_int));
+    ComputeOutputLength(mgpuctx, &lcl_row_offsets, &output_frontier_.length);
   
     if (Config::kMode != kV2N && Config::kMode != kE2N
         && output_frontier_.data == nullptr) {
-      lcl_row_offsets.length = input_frontier_.length + 1;
-      lcl_row_offsets.data = alloc_.template AllocateWorkspace<mg_int>(
-          lcl_row_offsets.length * sizeof(mg_int));
-      ComputeOutputLength(mgpuctx, &lcl_row_offsets, &output_frontier_.length);
       // The output frontier buffer should be allocated.
-      output_frontier_.data = alloc_.template AllocateData<mg_int>(
+      output_frontier_.data = alloc_->template AllocateData<mg_int>(
           output_frontier_.length * sizeof(mg_int));
     }
 
     switch (algo_) {
       case kGunrockLBOut :
-        CudaAdvanceGunrockLBOut(mgpuctx, lcl_row_offsets);
+        //CudaAdvanceGunrockLBOut(mgpuctx, lcl_row_offsets);
         break;
       default:
         LOG(FATAL) << "Algorithm " << algo_ << " is not supported.";
     }
 
     if (lcl_row_offsets.data) {
-      alloc_.FreeWorkspace(lcl_row_offsets.data);
+      alloc_->FreeWorkspace(lcl_row_offsets.data);
     }
   }
 
@@ -102,7 +102,7 @@ class CudaAdvanceExecutor {
     // edges input_frointer[i] has.
     IntArray1D edge_counts;
     edge_counts.length = input_frontier_.length;
-    edge_counts.data = alloc_.template AllocateWorkspace<mg_int>(
+    edge_counts.data = alloc_->template AllocateWorkspace<mg_int>(
         edge_counts.length * sizeof(mg_int));
     mgpu::transform(
       [] MGPU_DEVICE(int tid, const mg_int* rowoff, const mg_int* infront, mg_int* ecounts) {
@@ -124,7 +124,7 @@ class CudaAdvanceExecutor {
     CUDA_CALL(cudaMemcpy(outlen, lcl_row_offsets->data + edge_counts.length,
           sizeof(mg_int), cudaMemcpyDeviceToHost));
     LOG(INFO) << "Output frontier length: " << *outlen;
-    alloc_.FreeWorkspace(edge_counts.data);
+    alloc_->FreeWorkspace(edge_counts.data);
   }
 
   void CudaAdvanceGunrockLBOut(MgpuContext<Alloc>& mgpuctx, IntArray1D lcl_row_offsets) {
@@ -141,7 +141,7 @@ class CudaAdvanceExecutor {
     // use sorted search to compute the partition_starts 
     IntArray1D partition_starts;
     partition_starts.length = (M + ty - 1) / ty + 1;
-    partition_starts.data = alloc_.template AllocateWorkspace<mg_int>(
+    partition_starts.data = alloc_->template AllocateWorkspace<mg_int>(
         partition_starts.length * sizeof(mg_int));
     mgpu::sorted_search<mgpu::bounds_lower>(
         StridedIterator(0, ty, output_frontier_.length),
@@ -171,7 +171,7 @@ class CudaAdvanceExecutor {
             lcl_row_offsets, nparts_per_blk, partition_starts);
     }
 
-    alloc_.FreeWorkspace(partition_starts.data);
+    alloc_->FreeWorkspace(partition_starts.data);
   }
 
  private:
@@ -181,7 +181,7 @@ class CudaAdvanceExecutor {
   GData* gdata_;
   IntArray1D input_frontier_;
   IntArray1D output_frontier_;
-  Alloc alloc_;
+  Alloc* alloc_;
 };
 
 template <typename Config,
@@ -195,7 +195,7 @@ struct DispatchXPU<kDLGPU, Config, GData, Functor, Alloc> {
       GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
-      Alloc alloc) {
+      Alloc* alloc) {
     // Call advance
     if (Config::kAdvanceAll) {
       AdvanceAlg algo = FindAdvanceAllAlgo<Config>(rtcfg, csr);

@@ -1,16 +1,12 @@
 #ifndef SAMPLES_SAMPLES_UTILS_H_
 #define SAMPLES_SAMPLES_UTILS_H_
 
+#include <vector>
+#include <map>
 #include <time.h>
+#include "sys/time.h"
 
 namespace utils {
-
-#define CUDA_CALL(func)                                            \
-  {                                                                \
-    cudaError_t e = (func);                                        \
-    CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)       \
-        << "CUDA: " << cudaGetErrorString(e);                      \
-  }
 
 template<typename T>
 void VecPrint(const std::vector<T>& vec) {
@@ -61,6 +57,56 @@ __inline__ int _FindNumThreads(int dim, int max_nthrs) {
   }
   return ret;
 }
+
+#ifdef __CUDACC__
+#define CUDA_CALL(func)                                            \
+  {                                                                \
+    cudaError_t e = (func);                                        \
+    CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)       \
+        << "CUDA: " << cudaGetErrorString(e);                      \
+  }
+
+struct GPUAllocator {
+
+  template <typename T>
+  T* AllocateData(size_t bytes) {
+    void* ptr;
+    CUDA_CALL(cudaMalloc(&ptr, bytes));
+    return static_cast<T*>(ptr);
+  }
+
+  void FreeData(void* ptr) {
+    CUDA_CALL(cudaFree(ptr));
+  }
+
+  template <typename T>
+  T* AllocateWorkspace(size_t bytes) {
+    void* ptr;
+    if (!pool[bytes].empty()) {
+      ptr = pool[bytes].back();
+      pool[bytes].pop_back();
+    } else {
+      CUDA_CALL(cudaMalloc(&ptr, bytes));
+    }
+    wspace_size[ptr] = bytes;
+    return static_cast<T*>(ptr);
+  }
+
+  void FreeWorkspace(void* ptr) {
+    assert(wspace_size.count(ptr));
+    pool[wspace_size[ptr]].push_back(ptr);
+  }
+
+  std::map<void*, size_t> wspace_size;
+  std::map<size_t, std::vector<void*>> pool;
+
+  static GPUAllocator* Get() {
+    static GPUAllocator alloc;
+    return &alloc;
+  }
+};
+
+#endif  // __CUDACC__
 
 }  // namespace utils
 
