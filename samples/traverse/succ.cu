@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
   // prepare frontiers
   minigun::IntArray1D infront, outfront;
   std::vector<mg_int> infront_vec;
-  for (mg_int i = 3; i < 3 + 100; ++i) {
+  for (mg_int i = 3; i < 3 + 500; ++i) {
     infront_vec.push_back(i);
   }
   infront.length = infront_vec.size();

@@ -151,8 +151,8 @@ class CudaAdvanceExecutor {
         partition_starts.data,
         mgpu::less_t<mg_int>(),
         mgpuctx);
-    PrintDev(lcl_row_offsets);
-    PrintDev(partition_starts);
+    //PrintDev(lcl_row_offsets);
+    //PrintDev(partition_starts);
 
     if (ty > 512) {
       CUDAAdvanceLBKernel<1024, Config, GData, Functor>

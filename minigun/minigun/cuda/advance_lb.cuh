@@ -57,8 +57,8 @@ __global__ void CUDAAdvanceLBKernel(
   __shared__ mg_int s_glb_row_offsets[N_SMEM_ELEMENTS];
   __shared__ mg_int s_lcl2glb_vid[N_SMEM_ELEMENTS];
 
-  mg_int blk_out_start = 0;
-  mg_int part_idx = blockIdx.y;
+  mg_int blk_out_start = blockDim.y * nparts_per_blk * blockIdx.y;
+  mg_int part_idx = blockIdx.y * nparts_per_blk;
   const mg_int loop_end = min(partition_starts.length - 1,
                               part_idx + nparts_per_blk);
   while (part_idx < loop_end) {
@@ -68,6 +68,7 @@ __global__ void CUDAAdvanceLBKernel(
     const mg_int part_start = max(partition_starts.data[part_idx] - 1, 0L);
     const mg_int part_end = partition_starts.data[part_idx + 1];
     const mg_int in_item = part_start + threadIdx.y;
+    //printf("pidx=%ld, st=%ld ed=%ld\n", part_idx, part_start, part_end);
     if (in_item < part_end) {
       s_lcl_row_offsets[threadIdx.y] = lcl_row_offsets.data[in_item];
       const mg_int src = (Config::kMode == kE2V || Config::kMode == kE2E)?
@@ -85,6 +86,7 @@ __global__ void CUDAAdvanceLBKernel(
     // cooperatively process edges mapped by the row offsets
     // in the shared memory; each thread is in charge of one edge
     const mg_int out_item = blk_out_start + threadIdx.y;
+    //printf("(%d, %d): pidx=%ld %ld\n", blockIdx.y, threadIdx.y, part_idx, out_item);
     if (out_item < output_frontier.length) {
       // TODO(minjie): binary search is not always needed
       const mg_int s_lclsrc = BinarySearch<N_SMEM_ELEMENTS>(out_item, s_lcl_row_offsets) - 1;
