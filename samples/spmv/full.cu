@@ -42,7 +42,7 @@ std::vector<float> GroundTruth(
 int main(int argc, char** argv) {
   srand(42);
   std::vector<mg_int> row_offsets, column_indices;
-  utils::CreateNPGraph(1000, 0.01, row_offsets, column_indices);
+  utils::CreateNPGraph(10000, 0.01, row_offsets, column_indices);
   const mg_int N = row_offsets.size() - 1;
   const mg_int M = column_indices.size();
   std::cout << "#nodes: " << N << " #edges: " << M << std::endl;
