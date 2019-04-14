@@ -3,7 +3,8 @@
 
 #include <vector>
 #include <map>
-#include <time.h>
+#include <cmath>
+#include <ctime>
 #include "sys/time.h"
 
 namespace utils {
@@ -47,7 +48,7 @@ __inline__ void CreateNPGraph(int64_t N, float P,
 }
 
 // Find the number of threads that is:
-//  - power of two 
+//  - power of two
 //  - smaller or equal to dim
 //  - smaller or equal to max_nthrs
 __inline__ int _FindNumThreads(int dim, int max_nthrs) {

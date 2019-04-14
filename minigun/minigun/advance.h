@@ -4,9 +4,9 @@
 #include "./base.h"
 #include "./csr.h"
 #include "./mem.h"
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
 #include <cuda_runtime.h>
-#endif  // MINIGUN_USE_CUDA
+#endif  // __CUDACC__
 
 namespace minigun {
 namespace advance {
@@ -24,9 +24,9 @@ struct RuntimeConfig {
   int data_num_blocks = 0;
   // number of threads per block to process data dimension
   int data_num_threads = 0;
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
   cudaStream_t stream{nullptr};
-#endif  // MINIGUN_USE_CUDA
+#endif  // __CUDACC__
 };
 
 // Different frontier mode
@@ -89,8 +89,10 @@ void Advance(const RuntimeConfig& config,
 }  // namespace advance
 }  // namespace minigun
 
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
 #include "./cuda/advance.cuh"
+#else
+#include "./cpu/advance.h"
 #endif
 
 #endif  // MINIGUN_ADVANCE_H_

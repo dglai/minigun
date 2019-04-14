@@ -18,7 +18,6 @@ struct Csr {
 
   IntArray1D row_offsets;  // len == num_nodes + 1
   IntArray1D column_indices;  // len == num_edges
-  DLContext ctx;
 
 };
 
