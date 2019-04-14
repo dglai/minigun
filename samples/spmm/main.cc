@@ -94,7 +94,8 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLCPU, Config, GData, SPMMFunctor>(
-      config, csr, &gdata, infront, outfront);
+      config, csr, &gdata, infront, outfront,
+      utils::CPUAllocator::Get());
 
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, results) << std::endl;

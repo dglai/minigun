@@ -57,6 +57,7 @@ int main(int argc, char** argv) {
 
   // Create Runtime Config, not used for cpu
   minigun::advance::RuntimeConfig config;
+  config.ctx = {kDLCPU, 0};
 
   // Create vdata, edata and copy to GPU
   std::vector<float> vvec(N), evec(M);
@@ -80,7 +81,8 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
-      config, csr, &gdata, infront, outfront);
+      config, csr, &gdata, infront, outfront,
+      utils::CPUAllocator::Get());
 
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, results) << std::endl;

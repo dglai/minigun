@@ -55,7 +55,7 @@ struct DispatchXPU<kDLCPU, Config, GData, Functor, Alloc> {
       GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
-      const Alloc& alloc) {
+      Alloc* alloc) {
     //CHECK(output_frontier.length != 0);
     CPUAdvanceKernel<Config, GData, Functor>(csr, gdata, input_frontier, output_frontier);
   }

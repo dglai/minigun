@@ -19,6 +19,9 @@ enum AdvanceAlg {
 };
 
 struct RuntimeConfig {
+  // device context
+  DLContext ctx;
+  // the advance algorithm to use
   AdvanceAlg alg = kAuto;
   // number of thread blocks to process data dimension
   int data_num_blocks = 0;

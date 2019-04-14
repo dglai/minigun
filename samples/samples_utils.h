@@ -47,6 +47,53 @@ __inline__ void CreateNPGraph(int64_t N, float P,
   }
 }
 
+struct CPUAllocator {
+
+  template <typename T>
+  T* AllocateData(size_t bytes) {
+    void* ptr = malloc(bytes);
+    return static_cast<T*>(ptr);
+  }
+
+  void FreeData(void* ptr) {
+    free(ptr);
+  }
+
+  template <typename T>
+  T* AllocateWorkspace(size_t bytes) {
+    void* ptr;
+    if (!pool[bytes].empty()) {
+      ptr = pool[bytes].back();
+      pool[bytes].pop_back();
+    } else {
+      ptr = malloc(bytes);
+    }
+    wspace_size[ptr] = bytes;
+    return static_cast<T*>(ptr);
+  }
+
+  void FreeWorkspace(void* ptr) {
+    assert(wspace_size.count(ptr));
+    pool[wspace_size[ptr]].push_back(ptr);
+  }
+
+  std::map<void*, size_t> wspace_size;
+  std::map<size_t, std::vector<void*>> pool;
+
+  static CPUAllocator* Get() {
+    static CPUAllocator alloc;
+    return &alloc;
+  }
+};
+
+#ifdef __CUDACC__
+#define CUDA_CALL(func)                                            \
+  {                                                                \
+    cudaError_t e = (func);                                        \
+    CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)       \
+        << "CUDA: " << cudaGetErrorString(e);                      \
+  }
+
 // Find the number of threads that is:
 //  - power of two
 //  - smaller or equal to dim
@@ -58,14 +105,6 @@ __inline__ int _FindNumThreads(int dim, int max_nthrs) {
   }
   return ret;
 }
-
-#ifdef __CUDACC__
-#define CUDA_CALL(func)                                            \
-  {                                                                \
-    cudaError_t e = (func);                                        \
-    CHECK(e == cudaSuccess || e == cudaErrorCudartUnloading)       \
-        << "CUDA: " << cudaGetErrorString(e);                      \
-  }
 
 struct GPUAllocator {
 

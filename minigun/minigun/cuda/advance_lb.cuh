@@ -71,9 +71,20 @@ __global__ void CUDAAdvanceLBKernel(
     //printf("pidx=%ld, st=%ld ed=%ld\n", part_idx, part_start, part_end);
     if (in_item < part_end) {
       s_lcl_row_offsets[threadIdx.y] = lcl_row_offsets.data[in_item];
-      const mg_int src = (Config::kMode == kE2V || Config::kMode == kE2E)?
-        csr.column_indices.data[input_frontier.data[in_item]] :
-        input_frontier.data[in_item];
+      mg_int src = 0;
+      if (Config::kMode == kE2V || Config::kMode == kE2E) {
+        if (Config::kAdvanceAll) {
+          src = csr.column_indices.data[in_item];
+        } else {
+          src = csr.column_indices.data[input_frontier.data[in_item]];
+        }
+      } else {
+        if (Config::kAdvanceAll) {
+          src = in_item;
+        } else {
+          src = input_frontier.data[in_item];
+        }
+      }
       s_glb_row_offsets[threadIdx.y] = csr.row_offsets.data[src];
       s_lcl2glb_vid[threadIdx.y] = src;
     } else {

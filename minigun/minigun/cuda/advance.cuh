@@ -66,15 +66,22 @@ class CudaAdvanceExecutor {
     alloc_(alloc) { }
 
   void Run() {
-    MgpuContext<Alloc> mgpuctx(rtcfg_.stream, alloc_);
+    MgpuContext<Alloc> mgpuctx(
+        rtcfg_.ctx.device_id, rtcfg_.stream, alloc_);
     // Row offset array of local graph (graph sliced by nodes in input_frontier).
     // It's length == len(input_frontier) + 1, and
     // lcl_row_offsets[i+1] - lcl_row_offsets[i] == edge_counts[i]
     IntArray1D lcl_row_offsets;
-    lcl_row_offsets.length = input_frontier_.length + 1;
-    lcl_row_offsets.data = alloc_->template AllocateWorkspace<mg_int>(
-        lcl_row_offsets.length * sizeof(mg_int));
-    ComputeOutputLength(mgpuctx, &lcl_row_offsets, &output_frontier_.length);
+
+    if (Config::kAdvanceAll) {
+      lcl_row_offsets = csr_.row_offsets;
+      output_frontier_.length = csr_.column_indices.length;
+    } else {
+      lcl_row_offsets.length = input_frontier_.length + 1;
+      lcl_row_offsets.data = alloc_->template AllocateWorkspace<mg_int>(
+          lcl_row_offsets.length * sizeof(mg_int));
+      ComputeOutputLength(mgpuctx, &lcl_row_offsets, &output_frontier_.length);
+    }
   
     if (Config::kMode != kV2N && Config::kMode != kE2N
         && output_frontier_.data == nullptr) {
@@ -91,7 +98,7 @@ class CudaAdvanceExecutor {
         LOG(FATAL) << "Algorithm " << algo_ << " is not supported.";
     }
 
-    if (lcl_row_offsets.data) {
+    if (!Config::kAdvanceAll) {
       alloc_->FreeWorkspace(lcl_row_offsets.data);
     }
   }
@@ -120,10 +127,10 @@ class CudaAdvanceExecutor {
         mgpu::plus_t<mg_int>(),
         lcl_row_offsets->data + edge_counts.length,  // the last element stores the reduction.
         mgpuctx);
-    // get the reduction
+    //// get the reduction
     CUDA_CALL(cudaMemcpy(outlen, lcl_row_offsets->data + edge_counts.length,
           sizeof(mg_int), cudaMemcpyDeviceToHost));
-    LOG(INFO) << "Output frontier length: " << *outlen;
+    //LOG(INFO) << "Output frontier length: " << *outlen;
     alloc_->FreeWorkspace(edge_counts.data);
   }
 
@@ -136,8 +143,8 @@ class CudaAdvanceExecutor {
     const int nparts_per_blk = ((M + by - 1) / by + ty - 1) / ty;
     const dim3 nblks(rtcfg_.data_num_blocks, by);
     const dim3 nthrs(rtcfg_.data_num_threads, ty);
-    LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-      << nthrs.x << "," << nthrs.y << ")" << " nparts_per_blk=" << nparts_per_blk;
+    //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+    //  << nthrs.x << "," << nthrs.y << ")" << " nparts_per_blk=" << nparts_per_blk;
     // use sorted search to compute the partition_starts 
     IntArray1D partition_starts;
     partition_starts.length = (M + ty - 1) / ty + 1;
@@ -151,8 +158,6 @@ class CudaAdvanceExecutor {
         partition_starts.data,
         mgpu::less_t<mg_int>(),
         mgpuctx);
-    //PrintDev(lcl_row_offsets);
-    //PrintDev(partition_starts);
 
     if (ty > 512) {
       CUDAAdvanceLBKernel<1024, Config, GData, Functor>

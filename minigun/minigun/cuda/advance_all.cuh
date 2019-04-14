@@ -78,8 +78,8 @@ void CudaAdvanceAllGunrockLBOut(
   const int by = std::min((M + ny - 1) / ny, MAX_NBLOCKS);
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-    << nthrs.x << "," << nthrs.y << ")";
+  //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+  //  << nthrs.x << "," << nthrs.y << ")";
   CudaAdvanceAllGunrockLBOutKernel<Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, gdata, output_frontier);
 }
