@@ -85,7 +85,7 @@ class CudaAdvanceExecutor {
 
     switch (algo_) {
       case kGunrockLBOut :
-        //CudaAdvanceGunrockLBOut(mgpuctx, lcl_row_offsets);
+        CudaAdvanceGunrockLBOut(mgpuctx, lcl_row_offsets);
         break;
       default:
         LOG(FATAL) << "Algorithm " << algo_ << " is not supported.";

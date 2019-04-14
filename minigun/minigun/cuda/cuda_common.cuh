@@ -37,7 +37,7 @@ template<int dummy_arg>
 __global__ void dummy_k() { }
 
 // Cuda context that is compatible with modern gpu
-// One should aware that there might be some overhead to construct this context.
+// One should aware that there might be quite costly to construct this context.
 template <typename Alloc>
 class MgpuContext : public mgpu::context_t {
  public:
