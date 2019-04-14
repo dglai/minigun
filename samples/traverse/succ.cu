@@ -28,9 +28,10 @@ std::vector<float> GroundTruth(
     const std::vector<mg_int>& row_offsets,
     const std::vector<mg_int>& column_indices,
     const std::vector<float>& vdata,
-    const std::vector<float>& edata) {
+    const std::vector<float>& edata,
+    const std::vector<mg_int>& infront_vec) {
   std::vector<float> ret(vdata.size(), 0);
-  for (size_t u = 0; u < row_offsets.size() - 1; ++u) {
+  for (const mg_int u : infront_vec) {
     for (mg_int eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
       mg_int v = column_indices[eid];
       ret[v] += vdata[u] * edata[eid];
@@ -60,7 +61,10 @@ int main(int argc, char** argv) {
 
   // prepare frontiers
   minigun::IntArray1D infront, outfront;
-  std::vector<mg_int> infront_vec = {2, 4, 7, 10, 32};
+  std::vector<mg_int> infront_vec;
+  for (mg_int i = 3; i < 3 + 100; ++i) {
+    infront_vec.push_back(i);
+  }
   infront.length = infront_vec.size();
   CUDA_CALL(cudaMalloc(&infront.data, sizeof(mg_int) * infront_vec.size()));
   CUDA_CALL(cudaMemcpy(infront.data, &infront_vec[0],
@@ -96,7 +100,7 @@ int main(int argc, char** argv) {
 
   // Compute ground truth
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
-      vvec, evec);
+      vvec, evec, infront_vec);
   //utils::VecPrint(truth);
 
   typedef minigun::advance::Config<false, minigun::advance::kV2E> Config;

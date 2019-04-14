@@ -4,7 +4,7 @@
 namespace minigun {
 namespace advance {
 
-#define MAX_BLOCK_NTHREADS 1024
+#define MAX_NTHREADS 1024
 #define PER_THREAD_WORKLOAD 1
 #define MAX_NBLOCKS 65535L
 
@@ -73,7 +73,7 @@ void CudaAdvanceAllGunrockLBOut(
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
   const mg_int M = csr.column_indices.length;
-  const int ty = MAX_BLOCK_NTHREADS / rtcfg.data_num_threads;
+  const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
   const int by = std::min((M + ny - 1) / ny, MAX_NBLOCKS);
   const dim3 nblks(rtcfg.data_num_blocks, by);
@@ -113,7 +113,7 @@ void CudaAdvanceAll(
   }
 }
 
-#undef MAX_BLOCK_NTHREADS
+#undef MAX_NTHREADS
 #undef PER_THREAD_WORKLOAD
 #undef MAX_NBLOCKS
 

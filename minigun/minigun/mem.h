@@ -4,7 +4,7 @@
 #include <dmlc/logging.h>
 
 #ifdef MINIGUN_USE_CUDA
-#include "./cuda/cuda_common.h"
+#include "./cuda/cuda_common.cuh"
 #endif  // MINIGUN_USE_CUDA
 
 namespace minigun {

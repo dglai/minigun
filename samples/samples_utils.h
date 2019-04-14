@@ -26,7 +26,7 @@ bool VecEqual(const std::vector<T>& v1,
            const std::vector<T>& v2) {
   if (v1.size() != v2.size()) return false;
   for (size_t i = 0; i < v1.size(); ++i) {
-    if (fabs(v1[i] - v2[i]) >= 1e-5 * fabs(v1[i])) {
+    if (fabs(v1[i] - v2[i]) >= 1e-5 * fabs(v1[i]) + 1e-4) {
       std::cout << "@" << i << ": " << v1[i]
         << " v.s. " << v2[i] << std::endl;
       return false;

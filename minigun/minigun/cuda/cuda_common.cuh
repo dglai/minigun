@@ -38,9 +38,10 @@ __global__ void dummy_k() { }
 
 // Cuda context that is compatible with modern gpu
 // One should aware that there might be some overhead to construct this context.
+template <typename Alloc>
 class MgpuContext : public mgpu::context_t {
  public:
-  MgpuContext(cudaStream_t stream): stream_(stream) {
+  MgpuContext(cudaStream_t stream, Alloc alloc): stream_(stream), alloc_(alloc) {
     cudaFuncAttributes attr;
     CUDA_CALL(cudaFuncGetAttributes(&attr, dummy_k<0>));
     ptx_version_ = attr.ptxVersion;
@@ -63,11 +64,12 @@ class MgpuContext : public mgpu::context_t {
     return stream_;
   }
   void* alloc(size_t size, mgpu::memory_space_t space) override {
-    LOG(FATAL) << "Alloc is not implemented.";
-    return nullptr;
+    CHECK_EQ(space,  mgpu::memory_space_device);
+    return alloc_.template AllocateWorkspace<void>(size);
   }
   void free(void* p, mgpu::memory_space_t space) override {
-    LOG(FATAL) << "Free is not implemented.";
+    CHECK_EQ(space,  mgpu::memory_space_device);
+    alloc_.FreeWorkspace(p);
   }
   void synchronize() override {
     if (stream_) {
@@ -88,11 +90,35 @@ class MgpuContext : public mgpu::context_t {
   }
 
  private:
+  Alloc alloc_;
   int ptx_version_;
   cudaStream_t stream_;
   cudaEvent_t event_;
   cudaDeviceProp props_;
 };
+
+namespace types {
+
+// Make sure unsupported type will not compile
+extern __device__ __host__ void ErrorUnsupportedType();
+
+template <typename T>
+__device__ __host__ __forceinline__ T MaxValue() {
+  ErrorUnsupportedType();
+  return T();
+}
+
+template <>
+__device__ __host__ __forceinline__ int32_t MaxValue<int32_t>() {
+  return INT_MAX;
+}
+
+template <>
+__device__ __host__ __forceinline__ int64_t MaxValue<int64_t>() {
+  return LLONG_MAX;
+}
+
+}  // types
 
 }  // namespace minigun
 #endif  // MINIGUN_CUDA_CUDA_COMMON_H_
