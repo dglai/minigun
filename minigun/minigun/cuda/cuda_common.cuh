@@ -36,38 +36,77 @@ namespace minigun {
 template<int dummy_arg>
 __global__ void dummy_k() { }
 
-// Cuda context that is compatible with modern gpu
-// One should aware that there might be some overhead to construct this context.
-class MgpuContext : public mgpu::context_t {
+class CudaContext {
  public:
-  MgpuContext(cudaStream_t stream): stream_(stream) {
+  explicit CudaContext(int device_id): device_id_(device_id) {
     cudaFuncAttributes attr;
     CUDA_CALL(cudaFuncGetAttributes(&attr, dummy_k<0>));
     ptx_version_ = attr.ptxVersion;
+    CUDA_CALL(cudaGetDeviceProperties(&props_, device_id));
+  }
 
-    int ord;
-    CUDA_CALL(cudaGetDevice(&ord));
-    CUDA_CALL(cudaGetDeviceProperties(&props_, ord));
-    CUDA_CALL(cudaEventCreate(&event_));
+  int device_id() const {
+    return device_id_;
+  }
+  
+  int ptx_version() const {
+    return ptx_version_;
+  }
+
+  const cudaDeviceProp& props() const {
+    return props_;
+  }
+
+  static const CudaContext& Get(int device_id) {
+    static std::vector<CudaContext> contexts = InitContexts();
+    return contexts[device_id];
+  }
+
+ private:
+  // Init context for each device
+  static std::vector<CudaContext> InitContexts() {
+    std::vector<CudaContext> ret;
+    int count = 0;
+    CUDA_CALL(cudaGetDeviceCount(&count));
+    for (int i = 0; i < count; ++i) {
+      ret.emplace_back(CudaContext{i});
+    }
+    return ret;
+  }
+
+  int device_id_;
+  int ptx_version_;
+  cudaDeviceProp props_;
+};
+
+// Cuda context that is compatible with modern gpu
+template <typename Alloc>
+class MgpuContext : public mgpu::context_t {
+ public:
+  MgpuContext(int device_id, cudaStream_t stream, Alloc* alloc):
+    cuda_ctx_(CudaContext::Get(device_id)),
+    stream_(stream), alloc_(alloc) {
+    //CUDA_CALL(cudaEventCreate(&event_));
   }
   ~MgpuContext() {
-    CUDA_CALL(cudaEventDestroy(event_));
+    //CUDA_CALL(cudaEventDestroy(event_));
   }
   const cudaDeviceProp& props() const override {
-    return props_;
+    return cuda_ctx_.props();
   } 
   int ptx_version() const override {
-    return ptx_version_;
+    return cuda_ctx_.ptx_version();
   }
   cudaStream_t stream() override {
     return stream_;
   }
   void* alloc(size_t size, mgpu::memory_space_t space) override {
-    LOG(FATAL) << "Alloc is not implemented.";
-    return nullptr;
+    CHECK_EQ(space,  mgpu::memory_space_device);
+    return alloc_->template AllocateWorkspace<void>(size);
   }
   void free(void* p, mgpu::memory_space_t space) override {
-    LOG(FATAL) << "Free is not implemented.";
+    CHECK_EQ(space,  mgpu::memory_space_device);
+    alloc_->FreeWorkspace(p);
   }
   void synchronize() override {
     if (stream_) {
@@ -77,6 +116,7 @@ class MgpuContext : public mgpu::context_t {
     }
   }
   cudaEvent_t event() override {
+    LOG(FATAL) << "event is not implemented.";
     return event_;
   }
   void timer_begin() override {
@@ -88,11 +128,34 @@ class MgpuContext : public mgpu::context_t {
   }
 
  private:
-  int ptx_version_;
+  const CudaContext& cuda_ctx_;
   cudaStream_t stream_;
+  Alloc* alloc_;
   cudaEvent_t event_;
-  cudaDeviceProp props_;
 };
+
+namespace types {
+
+// Make sure unsupported type will not compile
+extern __device__ __host__ void ErrorUnsupportedType();
+
+template <typename T>
+__device__ __host__ __forceinline__ T MaxValue() {
+  ErrorUnsupportedType();
+  return T();
+}
+
+template <>
+__device__ __host__ __forceinline__ int32_t MaxValue<int32_t>() {
+  return INT_MAX;
+}
+
+template <>
+__device__ __host__ __forceinline__ int64_t MaxValue<int64_t>() {
+  return LLONG_MAX;
+}
+
+}  // types
 
 }  // namespace minigun
 #endif  // MINIGUN_CUDA_CUDA_COMMON_H_

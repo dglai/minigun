@@ -42,7 +42,7 @@ std::vector<float> GroundTruth(
 int main(int argc, char** argv) {
   srand(42);
   std::vector<mg_int> row_offsets, column_indices;
-  utils::CreateNPGraph(1000, 0.01, row_offsets, column_indices);
+  utils::CreateNPGraph(10000, 0.01, row_offsets, column_indices);
   const mg_int N = row_offsets.size() - 1;
   const mg_int M = column_indices.size();
   std::cout << "#nodes: " << N << " #edges: " << M << std::endl;
@@ -94,7 +94,8 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
-      config, csr, d_gdata, infront, outfront);
+      config, csr, d_gdata, infront, outfront,
+      utils::GPUAllocator::Get());
 
   CUDA_CALL(cudaDeviceSynchronize());
 
@@ -104,6 +105,18 @@ int main(int argc, char** argv) {
   //utils::VecPrint(rst);
 
   std::cout << "Correct? " << utils::VecEqual(truth, rst) << std::endl;
+
+  const int K = 10;
+  timeval t0, t1;
+  gettimeofday(&t0, nullptr);
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
+        config, csr, d_gdata, infront, outfront,
+        utils::GPUAllocator::Get());
+  }
+  CUDA_CALL(cudaDeviceSynchronize());
+  gettimeofday(&t1, nullptr);
+  std::cout << "Time(ms): " << (double)(t1.tv_usec - t0.tv_usec) / K / 1000.0 << std::endl;
 
   // free
 

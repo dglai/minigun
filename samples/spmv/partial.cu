@@ -6,6 +6,7 @@
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
+#include "sys/time.h"
 
 struct GData {
   float* cur{nullptr};
@@ -28,9 +29,10 @@ std::vector<float> GroundTruth(
     const std::vector<mg_int>& row_offsets,
     const std::vector<mg_int>& column_indices,
     const std::vector<float>& vdata,
-    const std::vector<float>& edata) {
+    const std::vector<float>& edata,
+    const std::vector<mg_int>& infront_vec) {
   std::vector<float> ret(vdata.size(), 0);
-  for (size_t u = 0; u < row_offsets.size() - 1; ++u) {
+  for (const mg_int u : infront_vec) {
     for (mg_int eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
       mg_int v = column_indices[eid];
       ret[v] += vdata[u] * edata[eid];
@@ -42,7 +44,7 @@ std::vector<float> GroundTruth(
 int main(int argc, char** argv) {
   srand(42);
   std::vector<mg_int> row_offsets, column_indices;
-  utils::CreateNPGraph(1000, 0.01, row_offsets, column_indices);
+  utils::CreateNPGraph(10000, 0.01, row_offsets, column_indices);
   const mg_int N = row_offsets.size() - 1;
   const mg_int M = column_indices.size();
   std::cout << "#nodes: " << N << " #edges: " << M << std::endl;
@@ -60,7 +62,11 @@ int main(int argc, char** argv) {
 
   // prepare frontiers
   minigun::IntArray1D infront, outfront;
-  std::vector<mg_int> infront_vec = {2, 4, 7, 10, 32};
+  std::vector<mg_int> infront_vec;
+  for (mg_int i = 3; i < 3 + 500; ++i) {
+    infront_vec.push_back(i);
+  }
+  LOG(INFO) << "Input frontier size: " << infront_vec.size();
   infront.length = infront_vec.size();
   CUDA_CALL(cudaMalloc(&infront.data, sizeof(mg_int) * infront_vec.size()));
   CUDA_CALL(cudaMemcpy(infront.data, &infront_vec[0],
@@ -96,12 +102,13 @@ int main(int argc, char** argv) {
 
   // Compute ground truth
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
-      vvec, evec);
+      vvec, evec, infront_vec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<false, minigun::advance::kV2E> Config;
+  typedef minigun::advance::Config<false, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
-      config, csr, d_gdata, infront, outfront);
+      config, csr, d_gdata, infront, outfront,
+      utils::GPUAllocator::Get());
 
   CUDA_CALL(cudaDeviceSynchronize());
 
@@ -111,6 +118,18 @@ int main(int argc, char** argv) {
   //utils::VecPrint(rst);
 
   std::cout << "Correct? " << utils::VecEqual(truth, rst) << std::endl;
+
+  const int K = 10;
+  timeval t0, t1;
+  gettimeofday(&t0, nullptr);
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
+        config, csr, d_gdata, infront, outfront,
+        utils::GPUAllocator::Get());
+  }
+  CUDA_CALL(cudaDeviceSynchronize());
+  gettimeofday(&t1, nullptr);
+  std::cout << "Time(ms): " << (double)(t1.tv_usec - t0.tv_usec) / K / 1000.0 << std::endl;
 
   // free
 

@@ -2,8 +2,8 @@ project(spmm)
 message("-- Project added: ${PROJECT_NAME}")
 
 if(USE_CUDA)
-  CUDA_ADD_EXECUTABLE(${PROJECT_NAME}_gpu main.cu)
-  target_link_libraries(${PROJECT_NAME}_gpu ${MINIGUN_LINKER_LIBS})
+  CUDA_ADD_EXECUTABLE(spmm_full_cuda full.cu)
+  target_link_libraries(spmm_full_cuda ${MINIGUN_LINKER_LIBS})
 endif()
 
 ADD_EXECUTABLE(${PROJECT_NAME}_cpu main.cc)

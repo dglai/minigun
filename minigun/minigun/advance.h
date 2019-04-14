@@ -19,6 +19,9 @@ enum AdvanceAlg {
 };
 
 struct RuntimeConfig {
+  // device context
+  DLContext ctx;
+  // the advance algorithm to use
   AdvanceAlg alg = kAuto;
   // number of thread blocks to process data dimension
   int data_num_blocks = 0;
@@ -61,7 +64,7 @@ struct DispatchXPU {
       GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
-      Alloc alloc) {
+      Alloc* alloc) {
     LOG(FATAL) << "Not implemented for XPU: " << XPU;
   }
 };
@@ -80,7 +83,7 @@ void Advance(const RuntimeConfig& config,
              GData* gdata,
              IntArray1D input_frontier,
              IntArray1D output_frontier,
-             Alloc alloc = Alloc()) {
+             Alloc* alloc = DefaultAllocator<XPU>::Get()) {
   DispatchXPU<XPU, Config, GData, Functor, Alloc>::Advance(
       config, csr, gdata,
       input_frontier, output_frontier, alloc);
