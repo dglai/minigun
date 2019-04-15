@@ -27,18 +27,17 @@ struct MaskedMMFunctor {
     const int D = gdata->D;
     const int H = gdata->H;
     // each thread handles one attention head
-    const mg_int h = blockIdx.x * blockDim.x + threadIdx.x;
-    mg_int srcoff = src * (D * H) + h * D;
-    mg_int dstoff = dst * (D * H) + h * D;
-    const mg_int srcend = (src + 1) * (D * H);
-    while (srcoff < srcend) {
+    mg_int h = blockIdx.x * blockDim.x + threadIdx.x;
+    while (h < H) {
+      const mg_int srcoff = src * (D * H) + h * D;
+      const mg_int dstoff = dst * (D * H) + h * D;
       float sum = 0.;
       for (int i = 0; i < D; ++i) {
-        sum += gdata->ndata[srcoff + i] * gdata->ndata[dstoff + i];
+        //sum += gdata->ndata[srcoff + i] * gdata->ndata[dstoff + i];
+        sum += __ldg(gdata->ndata + srcoff + i) * __ldg(gdata->ndata + dstoff + i);
       }
-      gdata->score[src * H + h] = sum;
-      srcoff += blockDim.x * D;
-      dstoff += blockDim.x * D;
+      gdata->score[eid * H + h] = sum;
+      h += blockDim.x;
     }
   }
 };
