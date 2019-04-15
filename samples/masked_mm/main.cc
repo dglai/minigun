@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
 
   // Create Runtime Config, not used for cpu
   minigun::advance::RuntimeConfig config;
+  config.ctx = {kDLCPU, 0};
 
   // Create feature data
   std::vector<float> vvec(N * D), evec(M);

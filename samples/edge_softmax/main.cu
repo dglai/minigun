@@ -136,6 +136,7 @@ int main(int argc, char** argv) {
 
   // Create stream
   minigun::advance::RuntimeConfig config;
+  config.ctx = {kDLGPU, 0};
   int nt = utils::_FindNumThreads(D, 32);
   config.data_num_threads = nt;
   config.data_num_blocks = (M + nt - 1) / nt;
