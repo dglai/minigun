@@ -4,7 +4,7 @@
 namespace minigun {
 namespace advance {
 
-#define MAX_BLOCK_NTHREADS 1024
+#define MAX_NTHREADS 1024
 #define PER_THREAD_WORKLOAD 1
 #define MAX_NBLOCKS 65535L
 
@@ -68,17 +68,18 @@ void CudaAdvanceAllGunrockLBOut(
     const RuntimeConfig& rtcfg,
     const Csr& csr,
     GData* gdata,
-    IntArray1D output_frontier) {
+    IntArray1D output_frontier,
+    Alloc* alloc) {
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
   const mg_int M = csr.column_indices.length;
-  const int ty = MAX_BLOCK_NTHREADS / rtcfg.data_num_threads;
+  const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
   const int by = std::min((M + ny - 1) / ny, MAX_NBLOCKS);
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-    << nthrs.x << "," << nthrs.y << ")";
+  //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+  //  << nthrs.x << "," << nthrs.y << ")";
   CudaAdvanceAllGunrockLBOutKernel<Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, gdata, output_frontier);
 }
@@ -92,18 +93,27 @@ void CudaAdvanceAll(
     const RuntimeConfig& rtcfg,
     const Csr& csr,
     GData* gdata,
-    IntArray1D output_frontier) {
+    IntArray1D output_frontier,
+    Alloc* alloc) {
+  if (Config::kMode != kV2N && Config::kMode != kE2N
+      && output_frontier.data == nullptr) {
+    // Allocate output frointer buffer, the length is equal to the number
+    // of edges.
+    output_frontier.length = csr.column_indices.length;
+    output_frontier.data = alloc->template AllocateData<mg_int>(
+        output_frontier.length * sizeof(mg_int));
+  }
   switch (algo) {
     case kGunrockLBOut :
       CudaAdvanceAllGunrockLBOut<Config, GData, Functor, Alloc>(
-          rtcfg, csr, gdata, output_frontier);
+          rtcfg, csr, gdata, output_frontier, alloc);
       break;
     default:
       LOG(FATAL) << "Algorithm " << algo << " is not supported.";
   }
 }
 
-#undef MAX_BLOCK_NTHREADS
+#undef MAX_NTHREADS
 #undef PER_THREAD_WORKLOAD
 #undef MAX_NBLOCKS
 

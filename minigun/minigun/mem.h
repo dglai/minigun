@@ -3,28 +3,18 @@
 
 #include <dmlc/logging.h>
 
-#ifdef MINIGUN_USE_CUDA
-#include "./cuda/cuda_common.h"
-#endif  // MINIGUN_USE_CUDA
+#ifdef __CUDACC__
+#include "./cuda/cuda_common.cuh"
+#endif  // __CUDACC__
 
 namespace minigun {
 
 template <int XPU>
 class DefaultAllocator {
  public:
-  template <typename T>
-  T* AllocateData(size_t bytes) {
+  static DefaultAllocator<XPU>* Get() {
     LOG(FATAL) << "Unsupported device type: " << XPU;
-  }
-  template <typename T>
-  T* AllocateWorkspace(size_t bytes) {
-    LOG(FATAL) << "Unsupported device type: " << XPU;
-  }
-  void FreeData(void* ptr) {
-    LOG(FATAL) << "Unsupported device type: " << XPU;
-  }
-  void FreeWorkspace(void* ptr) {
-    LOG(FATAL) << "Unsupported device type: " << XPU;
+    return nullptr;
   }
 };
 
@@ -45,9 +35,13 @@ class DefaultAllocator<kDLCPU> {
   void FreeWorkspace(void* ptr) {
     free(ptr);
   }
+  static DefaultAllocator<kDLCPU>* Get() {
+    static DefaultAllocator<kDLCPU> alloc;
+    return &alloc;
+  }
 };
 
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
 template <>
 class DefaultAllocator<kDLGPU> {
  public:
@@ -69,8 +63,12 @@ class DefaultAllocator<kDLGPU> {
   void FreeWorkspace(void* ptr) {
     CUDA_CALL(cudaFree(ptr));
   }
+  static DefaultAllocator<kDLGPU>* Get() {
+    static DefaultAllocator<kDLGPU> alloc;
+    return &alloc;
+  }
 };
-#endif  // MINIGUN_USE_CUDA
+#endif  // __CUDACC__
 
 }  // namespace minigun
 

@@ -4,9 +4,9 @@
 #include "./base.h"
 #include "./csr.h"
 #include "./mem.h"
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
 #include <cuda_runtime.h>
-#endif  // MINIGUN_USE_CUDA
+#endif  // __CUDACC__
 
 namespace minigun {
 namespace advance {
@@ -19,14 +19,17 @@ enum AdvanceAlg {
 };
 
 struct RuntimeConfig {
+  // device context
+  DLContext ctx;
+  // the advance algorithm to use
   AdvanceAlg alg = kAuto;
   // number of thread blocks to process data dimension
   int data_num_blocks = 0;
   // number of threads per block to process data dimension
   int data_num_threads = 0;
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
   cudaStream_t stream{nullptr};
-#endif  // MINIGUN_USE_CUDA
+#endif  // __CUDACC__
 };
 
 // Different frontier mode
@@ -61,7 +64,7 @@ struct DispatchXPU {
       GData* gdata,
       IntArray1D input_frontier,
       IntArray1D output_frontier,
-      Alloc alloc) {
+      Alloc* alloc) {
     LOG(FATAL) << "Not implemented for XPU: " << XPU;
   }
 };
@@ -80,7 +83,7 @@ void Advance(const RuntimeConfig& config,
              GData* gdata,
              IntArray1D input_frontier,
              IntArray1D output_frontier,
-             Alloc alloc = Alloc()) {
+             Alloc* alloc = DefaultAllocator<XPU>::Get()) {
   DispatchXPU<XPU, Config, GData, Functor, Alloc>::Advance(
       config, csr, gdata,
       input_frontier, output_frontier, alloc);
@@ -89,8 +92,10 @@ void Advance(const RuntimeConfig& config,
 }  // namespace advance
 }  // namespace minigun
 
-#ifdef MINIGUN_USE_CUDA
+#ifdef __CUDACC__
 #include "./cuda/advance.cuh"
+#else
+#include "./cpu/advance.h"
 #endif
 
 #endif  // MINIGUN_ADVANCE_H_
