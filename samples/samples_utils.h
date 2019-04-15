@@ -7,6 +7,8 @@
 #include <ctime>
 #include "sys/time.h"
 
+#include <dmlc/io.h>
+
 namespace utils {
 
 template<typename T>

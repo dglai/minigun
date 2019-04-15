@@ -20,7 +20,6 @@ struct MaskedMMFunctor {
   }
   static __device__ __forceinline__ void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    // only one block along the data dim
     mg_int tx = threadIdx.x;
     const mg_int dim = gdata->dim;
     float sum = 0.;
