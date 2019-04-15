@@ -3,6 +3,7 @@
 
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
+#include "./samples_utils.h"
 
 namespace utils {
 
@@ -48,13 +49,34 @@ __inline__ bool LoadGraphFromFile(const char* filename, utils::SampleCsr* out_cs
   return ret;
 }
 
-// create a minigun Csr that shares the given sample csr memory
-__inline__ minigun::Csr ToMinigunCsr(SampleCsr& sample_csr) {
+// create a minigun Csr that copies the given sample csr memory
+__inline__ minigun::Csr ToMinigunCsr(const SampleCsr& sample_csr, DLDeviceType device) {
   minigun::Csr csr;
-  csr.row_offsets.length = sample_csr.row_offsets.size();
-  csr.row_offsets.data = sample_csr.row_offsets.data();
-  csr.column_indices.length = sample_csr.column_indices.size();
-  csr.column_indices.data = sample_csr.column_indices.data();
+  const size_t rsize = sample_csr.row_offsets.size();
+  const size_t csize = sample_csr.column_indices.size();
+  if (device == kDLCPU) {
+    csr.row_offsets.length = rsize;
+    csr.row_offsets.data = new mg_int[rsize];
+    std::copy(sample_csr.row_offsets.begin(), sample_csr.row_offsets.end(),
+        csr.row_offsets.data);
+    csr.column_indices.length = csize;
+    csr.column_indices.data = new mg_int[csize];
+    std::copy(sample_csr.column_indices.begin(), sample_csr.column_indices.end(),
+        csr.column_indices.data);
+#ifdef __CUDACC__
+  } else if (device == kDLGPU) {
+    csr.row_offsets.length = rsize;
+    CUDA_CALL(cudaMalloc(&csr.row_offsets.data, rsize * sizeof(mg_int)));
+    CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &sample_csr.row_offsets[0],
+          sizeof(mg_int) * rsize, cudaMemcpyHostToDevice));
+    csr.column_indices.length = csize;
+    CUDA_CALL(cudaMalloc(&csr.column_indices.data, csize * sizeof(mg_int)));
+    CUDA_CALL(cudaMemcpy(csr.column_indices.data, &sample_csr.column_indices[0],
+          sizeof(mg_int) * csize, cudaMemcpyHostToDevice));
+#endif  // __CUDACC__
+  } else {
+    LOG(INFO) << "Unsupported device: " << device;
+  }
   return csr;
 }
 
