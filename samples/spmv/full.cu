@@ -61,6 +61,7 @@ int main(int argc, char** argv) {
 
   // Create stream
   minigun::advance::RuntimeConfig config;
+  config.ctx = {kDLGPU, 0};
   config.data_num_blocks = 1;
   config.data_num_threads = 1;
   CUDA_CALL(cudaStreamCreate(&config.stream));
