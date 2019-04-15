@@ -63,3 +63,4 @@ include(cmake/modules/CUDA.cmake)
 file(GLOB_RECURSE MINIGUN_SRC "minigun/minigun/*.h")
 
 add_subdirectory(samples)
+add_subdirectory(benchmark)
