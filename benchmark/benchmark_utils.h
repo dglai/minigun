@@ -1,7 +1,11 @@
 #ifndef __BENCHMARK_BENCHMARK_UTILS_H_
-#define __BENCHMAKR_BENCHMARK_UTILS_H_
+#define __BENCHMARK_BENCHMARK_UTILS_H_
 
 #include <time.h>
+#include <utility>
+#include <string>
+#include <cstdlib>
+#include <fstream>
 #include "special_graph.h"
 
 namespace utils{
@@ -34,6 +38,61 @@ bool VecAllClose(const std::vector<T>& v1,
     }
   }
   return true;
+}
+
+template<typename T>
+void LoadGraph(const std::string& path,
+    T& N,
+    std::vector<std::pair<T, T> >& edges) {
+  std::ifstream fin(path);
+  if (!fin) {
+    // TODO: throw an error here.
+    exit(1);
+  }
+  T M;
+  fin >> N >> M;
+  for (T i = 0; i < M; i++) {
+    T src, dst;
+    fin >> src >> dst;
+    edges.push_back(std::make_pair(src, dst));
+  }
+}
+
+template<typename T>
+void Coo2Csr(const T N,
+    std::vector<std::pair<T, T> > edges,
+    std::vector<T>& row_offsets,
+    std::vector<T>& column_indices) {
+  std::sort(edges.begin(), edges.end(), [](const std::pair<T, T> &e1, const std::pair<T, T> &e2) {
+      if (e1.first == e2.first)
+        return e1.second < e2.second;
+      else
+        return e1.first < e2.first;
+    });
+  row_offsets.resize(N + 1, 0);
+  for (auto &e: edges) {
+    T src = e.first, dst = e.second;
+    row_offsets[src + 1]++;
+    column_indices.push_back(dst);
+  }
+  for (T i = 1; i < N + 1; i++)
+    row_offsets[i] = row_offsets[i - 1] + row_offsets[i];
+}
+
+template<typename T>
+void CsrTranspose(const std::vector<T>& row_offsets,
+    const std::vector<T>& column_indices,
+    std::vector<T>& row_offsets_T,
+    std::vector<T>& column_indices_T) {
+  std::vector<std::pair<T, T> > edges;
+  T N = row_offsets.size() - 1;
+  for (T i = 0; i < N; i++) {
+    for (T j = row_offsets[i]; j < row_offsets[i + 1]; j++) {
+      T u = i, v = column_indices[j];
+      edges.push_back(std::make_pair(v, u));
+    }
+  }
+  Coo2Csr(N, edges, row_offsets_T, column_indices_T);
 }
 
 // Find the number of threads that is:
@@ -70,6 +129,15 @@ __inline__ void CreateFullBatch1(int64_t N,
     std::vector<mg_int>& row_offsets,
     std::vector<mg_int>& column_indices) {
   return graph::full_transformer_csr<mg_int>(N, 512, 512, false, row_offsets, column_indices);
+}
+
+__inline__ void CreateDatasetGraph(const std::string& path,
+    std::vector<mg_int>& row_offsets,
+    std::vector<mg_int>& column_indices) {
+  mg_int N = 0;
+  std::vector<std::pair<mg_int, mg_int> > edges;
+  LoadGraph<mg_int>(path, N, edges);
+  Coo2Csr(N, edges, row_offsets, column_indices);
 }
 
 } // namespace utils
