@@ -8,6 +8,10 @@ if(USE_CUDA)
   target_link_libraries(spmv_partial_cuda ${MINIGUN_LINKER_LIBS})
 endif()
 
-ADD_EXECUTABLE(${PROJECT_NAME}_cpu full.cc)
-target_compile_options(${PROJECT_NAME}_cpu PUBLIC -fopenmp)
-target_link_libraries(${PROJECT_NAME}_cpu ${MINIGUN_LINKER_LIBS})
+ADD_EXECUTABLE(spmv_full_cpu full.cc)
+target_compile_options(spmv_full_cpu PUBLIC -fopenmp)
+target_link_libraries(spmv_full_cpu ${MINIGUN_LINKER_LIBS})
+
+ADD_EXECUTABLE(spmv_partial_cpu partial.cc)
+target_compile_options(spmv_partial_cpu PUBLIC -fopenmp)
+target_link_libraries(spmv_partial_cpu ${MINIGUN_LINKER_LIBS})
