@@ -21,11 +21,10 @@ __global__ void maskedmm_csr_forward_kernel(
     for (idx_t j = indptr[i] + tx; j < indptr[i + 1]; j += blockDim.x) {
       for (int ko = 0; ko < h; ++ko) {
         data_t sum = 0;
-        //for (int ki = 0; ki < d; ++ki) {
-          //sum += A[(i * h + ko) * d + ki] * B[(indices[j] * h + ko) * d + ki]; //B[(ko * d + ki) * n + indices[j]];
-        //}
-        //y[j * h + ko] = sum;
-        y[j * h + ko] = 0.;
+        for (int ki = 0; ki < d; ++ki) {
+          sum += A[(i * h + ko) * d + ki] * B[(indices[j] * h + ko) * d + ki]; //B[(ko * d + ki) * n + indices[j]];
+        }
+        y[j * h + ko] = sum;
       }
     }
   }
