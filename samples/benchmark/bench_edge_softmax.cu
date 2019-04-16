@@ -11,32 +11,26 @@
 using minigun::advance::RuntimeConfig;
 
 struct GData {
-  int D = 0;  // feat size
   int H = 0;  // num heads
-  float* ndata{nullptr};
   float* score{nullptr};
+  float* sum{nullptr};
+  float* max{nullptr};
 };
 
-struct MaskedMMFunctor {
+// Max
+struct EdgeMax {
   static __device__ __forceinline__ bool CondEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    const int D = gdata->D;
-    const int H = gdata->H;
-    // each thread handles one attention head
-    int h = blockIdx.x * blockDim.x + threadIdx.x;
-    while (h < H) {
-      const float* srcoff = gdata->ndata + (src * H + h) * D;
-      const float* dstoff = gdata->ndata + (dst * H + h) * D;
-      float sum = 0.;
-      for (int i = 0; i < D; ++i) {
-        sum += __ldg(srcoff + i) * __ldg(dstoff + i);
-      }
-      gdata->score[eid * H + h] = sum;
-      h += blockDim.x;
+    mg_int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    mg_int stride_x = blockDim.x * gridDim.x;
+    const mg_int dim = gdata->head;
+    while (tx < dim) {
+      MyAtomicMax(gdata->max + dst * dim + tx, gdata->score[eid * dim + tx]);
+      tx += stride_x;
     }
   }
 };
@@ -114,15 +108,13 @@ double RunBaseline1(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* 
 
 int main(int argc, char** argv) {
   srand(42);
-  if (argc < 4) {
-    std::cout << "USAGE: ./bench_masked_mm <file_name> <feat_size> <num_heads>" << std::endl;
+  if (argc < 3) {
+    std::cout << "USAGE: ./bench_masked_mm <file_name> <num_heads>" << std::endl;
     return 1;
   }
   const char* filename = argv[1];
-  const int feat_size = std::atoi(argv[2]);
-  const int num_heads = std::atoi(argv[3]);
-  std::cout << "filename=" << filename << " feat_size=" << feat_size
-    << " num_heads=" << num_heads << std::endl;
+  const int num_heads = std::atoi(argv[2]);
+  std::cout << "filename=" << filename << " num_heads=" << num_heads << std::endl;
 
   utils::SampleCsr scsr;
   utils::LoadGraphFromFile(filename, &scsr);
@@ -135,7 +127,6 @@ int main(int argc, char** argv) {
 
   // gdata
   GData gdata;
-  gdata.D = feat_size;
   gdata.H = num_heads;
   InitGData(&gdata, N, M);
   GData* d_gdata;
@@ -151,7 +142,6 @@ int main(int argc, char** argv) {
   cfg.data_num_blocks = gdata.H / nt;
   CUDA_CALL(cudaStreamCreate(&cfg.stream));
 
-  //double dur1 = RunMinigun(cfg, csr, d_gdata);
   double dur1 = RunMinigun(cfg, csr, d_gdata);
   std::cout << "minigun time(ms): " << dur1 << std::endl;
   double dur2 = RunBaseline1(cfg, csr, &gdata);

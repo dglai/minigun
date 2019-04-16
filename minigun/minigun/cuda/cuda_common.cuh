@@ -134,6 +134,15 @@ class MgpuContext : public mgpu::context_t {
   cudaEvent_t event_;
 };
 
+template <typename T>
+__device__ __forceinline__ T _ldg(T* addr) {
+#if __CUDA_ARCH__ >= 350
+  return __ldg(addr);
+#else
+  return *addr;
+#endif
+}
+
 namespace types {
 
 // Make sure unsupported type will not compile
