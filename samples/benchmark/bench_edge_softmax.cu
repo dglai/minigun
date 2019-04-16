@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <limits>
 #include <time.h>
 #include <cuda_runtime.h>
 
@@ -15,7 +16,20 @@ struct GData {
   float* score{nullptr};
   float* sum{nullptr};
   float* max{nullptr};
+  float* ret{nullptr};
 };
+
+__device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
+  uint32_t* addr_as_ui = reinterpret_cast<uint32_t*>(addr);
+  uint32_t old = *addr_as_ui;
+  uint32_t assumed = old;
+  do {
+    assumed = old;
+    old = atomicCAS(addr_as_ui, assumed,
+        __float_as_uint(fmax(val, __uint_as_float(old))));
+  } while (assumed != old);
+  return __uint_as_float(old);
+}
 
 // Max
 struct EdgeMax {
@@ -25,26 +39,79 @@ struct EdgeMax {
   }
   static __device__ __forceinline__ void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    mg_int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    mg_int stride_x = blockDim.x * gridDim.x;
-    const mg_int dim = gdata->head;
-    while (tx < dim) {
-      MyAtomicMax(gdata->max + dst * dim + tx, gdata->score[eid * dim + tx]);
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride_x = blockDim.x * gridDim.x;
+    const int H = gdata->H;
+    float* inoff = gdata->score + eid * H;
+    float* outoff = gdata->max + dst * H;
+    while (tx < H) {
+      MyAtomicMax(outoff + tx, __ldg(inoff + tx));
+      tx += stride_x;
+    }
+  }
+};
+
+// minus max, exp and sum
+struct MinusMaxExpSum {
+  static __device__ __forceinline__ bool CondEdge(
+      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    return true;
+  }
+  static __device__ __forceinline__ void ApplyEdge(
+      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride_x = blockDim.x * gridDim.x;
+    const int H = gdata->H;
+    const float* score_off = gdata->score + eid * H;
+    float* ret_off = gdata->ret + eid * H;
+    float* max_off = gdata->max + dst * H;
+    float* sum_off = gdata->sum + dst * H;
+    while (tx < H) {
+      const float new_score = expf(__ldg(score_off + tx) - __ldg(max_off + tx));
+      atomicAdd(sum_off + tx, new_score);
+      *(ret_off + tx) = new_score;
+      tx += stride_x;
+    }
+  }
+};
+
+// norm
+struct Norm {
+  static __device__ __forceinline__ bool CondEdge(
+      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    return true;
+  }
+  static __device__ __forceinline__ void ApplyEdge(
+      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride_x = blockDim.x * gridDim.x;
+    const int H = gdata->H;
+    float* ret_off = gdata->ret + eid * H;
+    float* sum_off = gdata->sum + dst * H;
+    while (tx < H) {
+      *(ret_off + tx) /= __ldg(sum_off + tx);
       tx += stride_x;
     }
   }
 };
 
 void InitGData(GData* gdata, mg_int N, mg_int M) {
-  std::vector<float> ndata(N * gdata->D * gdata->H), score(M * gdata->H, 0.);
-  for (mg_int i = 0; i < ndata.size(); ++i) {
-    ndata[i] = (float)rand() / RAND_MAX;
+  std::vector<float> sum(N * gdata->H, 0.), max(N * gdata->H, std::numeric_limits<float>::lowest());
+  std::vector<float> score(M * gdata->H, 0.), ret(M * gdata->H, 0.);
+  for (mg_int i = 0; i < score.size(); ++i) {
+    score[i] = (float)rand() / RAND_MAX;
   }
-  CUDA_CALL(cudaMalloc(&(gdata->ndata), sizeof(float) * N * gdata->D * gdata->H));
-  CUDA_CALL(cudaMemcpy(gdata->ndata, &ndata[0],
-        sizeof(float) * N * gdata->D * gdata->H, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&(gdata->sum), sizeof(float) * N * gdata->H));
+  CUDA_CALL(cudaMemcpy(gdata->sum, &sum[0],
+        sizeof(float) * N * gdata->H, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&(gdata->max), sizeof(float) * N * gdata->H));
+  CUDA_CALL(cudaMemcpy(gdata->max, &max[0],
+        sizeof(float) * N * gdata->H, cudaMemcpyHostToDevice));
   CUDA_CALL(cudaMalloc(&(gdata->score), sizeof(float) * M * gdata->H));
   CUDA_CALL(cudaMemcpy(gdata->score, &score[0],
+        sizeof(float) * M * gdata->H, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&(gdata->ret), sizeof(float) * M * gdata->H));
+  CUDA_CALL(cudaMemcpy(gdata->ret, &ret[0],
         sizeof(float) * M * gdata->H, cudaMemcpyHostToDevice));
 }
 
@@ -53,7 +120,11 @@ double RunMinigun(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* d_
 
   // dry run
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLGPU, Config, GData, MaskedMMFunctor>(
+  minigun::advance::Advance<kDLGPU, Config, GData, EdgeMax>(
+      rtcfg, csr, d_gdata, infront, outfront);
+  minigun::advance::Advance<kDLGPU, Config, GData, MinusMaxExpSum>(
+      rtcfg, csr, d_gdata, infront, outfront);
+  minigun::advance::Advance<kDLGPU, Config, GData, Norm>(
       rtcfg, csr, d_gdata, infront, outfront);
   CUDA_CALL(cudaDeviceSynchronize());
 
@@ -61,8 +132,11 @@ double RunMinigun(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* d_
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-    minigun::advance::Advance<kDLGPU, Config, GData, MaskedMMFunctor>(
+    minigun::advance::Advance<kDLGPU, Config, GData, EdgeMax>(
+        rtcfg, csr, d_gdata, infront, outfront);
+    minigun::advance::Advance<kDLGPU, Config, GData, MinusMaxExpSum>(
+        rtcfg, csr, d_gdata, infront, outfront);
+    minigun::advance::Advance<kDLGPU, Config, GData, Norm>(
         rtcfg, csr, d_gdata, infront, outfront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
@@ -75,28 +149,25 @@ double RunMinigun(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* d_
 
 double RunBaseline1(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* gdata) {
   const mg_int N = csr.row_offsets.length - 1;
+  const int H = gdata->H;
 
   // dry run
-  custom_kernel::maskedmm_csr_forward_kernel<mg_int, float><<<N, 32>>>(
+  custom_kernel::sparse_softmax_forward_kernel<mg_int, float><<<(N + 31) / 32, dim3(32, H)>>>(
       csr.row_offsets.data,
-      csr.column_indices.data,
-      gdata->ndata,
-      gdata->ndata,
       gdata->score,
-      (int)gdata->D, (int)N, (int)gdata->H);
+      gdata->ret,
+      (int)N, (int)H);
   CUDA_CALL(cudaDeviceSynchronize());
 
   const int K = 10;
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    custom_kernel::maskedmm_csr_forward_kernel<mg_int, float><<<N, 32>>>(
+    custom_kernel::sparse_softmax_forward_kernel<mg_int, float><<<(N + 31) / 32, dim3(32, H)>>>(
         csr.row_offsets.data,
-        csr.column_indices.data,
-        gdata->ndata,
-        gdata->ndata,
         gdata->score,
-        (int)gdata->D, (int)N, (int)gdata->H);
+        gdata->ret,
+        (int)N, (int)H);
   }
   CUDA_CALL(cudaDeviceSynchronize());
   gettimeofday(&t1, nullptr);

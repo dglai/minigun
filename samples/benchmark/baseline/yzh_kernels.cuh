@@ -90,6 +90,31 @@ __global__ void vector_spmm_forward_kernel(
 }
 
 /*
+ * CUDA Kernel of the forward function for Source Multiply Edge Function.
+ * For `src_mul_edge` operation, the arguments are csr(column-major) representations.
+ * no eid
+ */
+template <typename idx_t, typename data_t>
+__global__ void vector_spmm_forward_kernel_no_eid(
+    const idx_t* __restrict__ indptr,
+    const idx_t* __restrict__ indices,
+    const data_t* __restrict__ edata,
+    const data_t* __restrict__ x,
+    data_t* __restrict__ y,
+    const int d, const int n, const int h) {
+  int i = blockIdx.x;
+  int tx = threadIdx.x;
+  if (i < n) {
+    for (int j = tx; j < d * h; j += blockDim.x) {
+      data_t sum = 0;
+      for (int k = indptr[i]; k < indptr[i + 1]; ++k)
+        sum += edata[h + j / d] * x[indices[k] * d * h + j];
+      y[i * d * h + j] = sum;
+    }
+  }
+}
+
+/*
  * CUDA Kernel of the backward function for Source Multiply Edge Function.
  */
 template <typename idx_t, typename data_t>
