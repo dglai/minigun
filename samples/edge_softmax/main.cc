@@ -2,7 +2,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <limits>
-#include <omp.h>
+#include <dmlc/omp.h>
 #include <chrono>
 
 #include <minigun/minigun.h>

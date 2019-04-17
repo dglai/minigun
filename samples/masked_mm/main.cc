@@ -1,7 +1,7 @@
 /* Sample code for Dense-Dense => Sparse Matrix multiplication.*/
 #include <iostream>
 #include <cstdlib>
-#include <omp.h>
+#include <dmlc/omp.h>
 #include <chrono>
 
 #include <minigun/minigun.h>
