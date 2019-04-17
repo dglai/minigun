@@ -131,10 +131,14 @@ double RunBaseline1(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* 
   const mg_int N = csr.row_offsets.length - 1;
   const int H = gdata->H;
 
+  if (H > 64) {
+    // thread block can have at most 64 threads in z dimension.
+    return 100.0;
+  }
+
   // dry run
-  std::cout << 1024 / H << " " << H << std::endl;
   custom_kernel::sparse_softmax_backward_kernel_no_eid<mg_int, float>
-    <<<dim3(N, 1, 1), dim3(1, 1024/H, H)>>>(
+    <<<dim3(N, 1, 1), dim3(1, 256/H, H)>>>(
       csr.row_offsets.data,
       gdata->grad_score,
       gdata->score,
@@ -147,7 +151,7 @@ double RunBaseline1(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* 
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     custom_kernel::sparse_softmax_backward_kernel_no_eid<mg_int, float>
-      <<<dim3(N, 1, 1), dim3(1, 1024/H, H)>>>(
+      <<<dim3(N, 1, 1), dim3(1, 256/H, H)>>>(
         csr.row_offsets.data,
         gdata->grad_score,
         gdata->score,
@@ -165,7 +169,7 @@ double RunBaseline1(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* 
 int main(int argc, char** argv) {
   srand(42);
   if (argc < 3) {
-    std::cout << "USAGE: ./bench_masked_mm <file_name> <num_heads>" << std::endl;
+    std::cout << "USAGE: ./bench_backward_edge_softmax <file_name> <num_heads>" << std::endl;
     return 1;
   }
   const char* filename = argv[1];
