@@ -102,6 +102,122 @@ struct MaskedMM {
   }
 };
 
+// Vector SPMM
+template <typename GData>
+struct VecSPMM {
+  static __device__ __forceinline__ bool CondEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    return true;
+  }
+  // ndata: (n, h, d)
+  // edata: (e, h)
+  static __device__ __forceinline__ void ApplyEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    const int D = gdata->D;
+    const int H = gdata->H;
+    // each thread handles one attention head
+    int h = blockIdx.x * blockDim.x + threadIdx.x;
+    while (h < H) {
+      for (int i = 0; i < D; i++) {
+        atomicAdd(gdata->feat_y + (src * H + h) * D + i,
+                  gdata->feat_x[(src * H + h) * D + i] * gdata->weight[eid * H + h]);
+      }
+      h += blockDim.x;
+    }
+  }
+};
+
+// backward masked mm
+template <typename GData>
+struct BackMaskedMM {
+  static __device__ __forceinline__ bool CondEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    return true;
+  }
+  static __device__ __forceinline__ void ApplyEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    const int D = gdata->D;
+    const int H = gdata->H;
+    // each thread handles one attention head
+    int h = blockIdx.x * blockDim.x + threadIdx.x;
+    while (h < H) {
+      for (int i = 0; i < D; i++) {
+        atomicAdd(gdata->grad_x + (src * H + h) * D + i, gdata->grad_weight[eid * H + h] * gdata->feat_y[(dst * H + h) * D + i]);
+        atomicAdd(gdata->grad_y + (dst * H + h) * D + i, gdata->grad_weight[eid * H + h] * gdata->feat_x[(src * H + h) * D + i]);
+      }
+      h += blockDim.x;
+    }
+  }
+};
+
+// backward softmax phase 0
+template <typename GData>
+struct BackSoftmaxAccum {
+  static __device__ __forceinline__ bool CondEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    return true;
+  }
+  // accum: (N, H)
+  static __device__ __forceinline__ void ApplyEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    const int H = gdata->H;
+    // each thread handles one attention head
+    int h = blockIdx.x * blockDim.x + threadIdx.x;
+    while (h < H) {
+      sds = gdata->score[eid * H + h] * gdata->grad_score[eid * H + h];
+      gdata->grad_weight[eid * H + h] = sds;
+      atomicAdd(gdata->accum[dst * H + h], sds);
+      h += blockDim.x;
+    }
+  }
+}
+
+template <typename GData>
+struct BackSoftmaxMinus {
+  static __device__ __forceinline__ bool CondEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    return true;
+  }
+  // accum: (N, H)
+  static __device__ __forceinline__ void ApplyEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    const int H = gdata->H;
+    // each thread handles one attention head
+    int h = blockIdx.x * blockDim.x + threadIdx.x;
+    while (h < H) {
+      gdata->grad_weight[eid * H + h] -= gdata->score[eid * H + h] * gdata->accum[dst * H + h];
+      h += blockDim.x;
+    }
+  }
+}
+
+// backward vector spmm
+template <typename GData>
+struct BackVecSPMM {
+  static __device__ __forceinline__ bool CondEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    return true;
+  }
+  static __device__ __forceinline__ void ApplyEdge(
+    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    // only one block along the data dim
+    mg_int tx = threadIdx.x;
+    const int D = gdata->D;
+    const int H = gdata->H;
+    // each thread handles one attention head
+    int h = blockIdx.x * blockDim.x + threadIdx.x;
+    while (h < H) {
+      float sum = 0;
+      for (int i = 0; i < D; i++) {
+        sum += gdata->feat_x[(src * H + h) * D + i] * gdata->grad_y[(dst * H + h) * D + i];
+        atomicAdd(gdata->grad_x + (src * H + h) * D + i, gdata->weight[eid * H + h] * gdata->grad_y[(dst * H + h) * D + i]);
+      }
+      gdata->grad_weight[eid * H + h] = sum;
+      h += blockDim.x;
+    }
+  }
+}
+
 } // end of namespace
 
 #endif
