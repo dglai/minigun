@@ -1,7 +1,6 @@
 /* Sample code for Sparse-Matrix-Vector multiplication.*/
 #include <iostream>
 #include <cstdlib>
-#include <time.h>
 #include <omp.h>
 #include <chrono>
 

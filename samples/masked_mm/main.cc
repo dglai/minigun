@@ -1,8 +1,8 @@
 /* Sample code for Dense-Dense => Sparse Matrix multiplication.*/
 #include <iostream>
 #include <cstdlib>
-#include <time.h>
 #include <omp.h>
+#include <chrono>
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
@@ -23,7 +23,6 @@ struct MaskedMMFunctor {
     // only one block along the data dim
     const mg_int dim = gdata->dim;
     float sum = 0.;
-#pragma omp parallel for reduction (+:sum)
     for (mg_int fid = 0; fid < dim; ++fid) {
       sum += gdata->ndata[src * dim + fid] * gdata->ndata[dst * dim + fid];
     }
@@ -99,5 +98,20 @@ int main(int argc, char** argv) {
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, evec) << std::endl;
 
+  const int K = 10;
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLCPU, Config, GData, MaskedMMFunctor>(
+        config, csr, &gdata, infront, outfront);
+  }
+
+  auto start = std::chrono::system_clock::now();
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLCPU, Config, GData, MaskedMMFunctor>(
+        config, csr, &gdata, infront, outfront);
+  }
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  std::cout << "Time(ms): " << elapsed_seconds.count() * 1e3 / K << std::endl;
+  return 0;
   return 0;
 }
