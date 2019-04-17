@@ -98,14 +98,21 @@ int main(int argc, char** argv) {
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, results) << std::endl;
 
+  // warm up
   const int K = 10;
-  auto start = std::chrono::steady_clock::now();
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
         config, csr, &gdata, infront, outfront,
         utils::CPUAllocator::Get());
   }
-  auto end = std::chrono::steady_clock::now();
+
+  auto start = std::chrono::system_clock::now();
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
+        config, csr, &gdata, infront, outfront,
+        utils::CPUAllocator::Get());
+  }
+  auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   std::cout << "Time(ms): " << elapsed_seconds.count() * 1e3 / K << std::endl;
   return 0;
