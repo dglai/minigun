@@ -7,7 +7,11 @@
 #include <ctime>
 #include "sys/time.h"
 
+#include <dmlc/io.h>
+
 namespace utils {
+
+#define FCLOSE(a, b) (fabs((a) - (b)) < 1e-5 * fabs(a) + 1e-4)
 
 template<typename T>
 void VecPrint(const std::vector<T>& vec) {
@@ -23,9 +27,20 @@ bool VecEqual(const std::vector<T>& v1,
            const std::vector<T>& v2) {
   if (v1.size() != v2.size()) return false;
   for (size_t i = 0; i < v1.size(); ++i) {
-    if (fabs(v1[i] - v2[i]) >= 1e-5 * fabs(v1[i]) + 1e-4) {
+    if (!(FCLOSE(v1[i], v2[i]))) {
       std::cout << "@" << i << ": " << v1[i]
         << " v.s. " << v2[i] << std::endl;
+      return false;
+    }
+  }
+  return true;
+}
+
+template <typename Iter1, typename Iter2>
+bool IterEqual(Iter1 v1, Iter2 v2, size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    if (!(FCLOSE(v1[i], v2[i]))) {
+      std::cout << "@" << i << ": " << v1[i] << " v.s. " << v2[i] << std::endl;
       return false;
     }
   }

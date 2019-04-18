@@ -65,27 +65,28 @@ __global__ void CUDAAdvanceLBKernel(
     // cooperatively load row offsets into load shared mem
     // each thread is in charge of one vertex
     // TODO(minjie): can use more threads
-    const mg_int part_start = max(partition_starts.data[part_idx] - 1, 0L);
-    const mg_int part_end = partition_starts.data[part_idx + 1];
+    const mg_int part_start = max(_ldg(partition_starts.data + part_idx) - 1, 0L);
+    const mg_int part_end = _ldg(partition_starts.data + part_idx + 1);
     const mg_int in_item = part_start + threadIdx.y;
     //printf("pidx=%ld, st=%ld ed=%ld\n", part_idx, part_start, part_end);
     if (in_item < part_end) {
-      s_lcl_row_offsets[threadIdx.y] = lcl_row_offsets.data[in_item];
+      s_lcl_row_offsets[threadIdx.y] = _ldg(lcl_row_offsets.data + in_item);
       mg_int src = 0;
       if (Config::kMode == kE2V || Config::kMode == kE2E) {
         if (Config::kAdvanceAll) {
-          src = csr.column_indices.data[in_item];
+          src = _ldg(csr.column_indices.data + in_item);
         } else {
-          src = csr.column_indices.data[input_frontier.data[in_item]];
+          const mg_int in_eid = _ldg(input_frontier.data + in_item);
+          src = _ldg(csr.column_indices.data + in_eid);
         }
       } else {
         if (Config::kAdvanceAll) {
           src = in_item;
         } else {
-          src = input_frontier.data[in_item];
+          src = _ldg(input_frontier.data + in_item);
         }
       }
-      s_glb_row_offsets[threadIdx.y] = csr.row_offsets.data[src];
+      s_glb_row_offsets[threadIdx.y] = _ldg(csr.row_offsets.data + src);
       s_lcl2glb_vid[threadIdx.y] = src;
     } else {
       s_lcl_row_offsets[threadIdx.y] = types::MaxValue<mg_int>();
@@ -105,7 +106,7 @@ __global__ void CUDAAdvanceLBKernel(
       // find the index of the current edge w.r.t. its src node
       const mg_int veid = out_item - s_lcl_row_offsets[s_lclsrc];
       const mg_int eid = s_glb_row_offsets[s_lclsrc] + veid;
-      const mg_int dst = csr.column_indices.data[eid];
+      const mg_int dst = _ldg(csr.column_indices.data + eid);
       //printf("%ld %ld %ld %ld %ld\n", out_item, s_lclsrc, src, eid, dst);
       if (Functor::CondEdge(src, dst, eid, gdata)) {
         Functor::ApplyEdge(src, dst, eid, gdata);

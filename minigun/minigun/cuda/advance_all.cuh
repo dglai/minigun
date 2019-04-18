@@ -1,6 +1,8 @@
 #ifndef MINIGUN_CUDA_ADVANCE_ALL_CUH_
 #define MINIGUN_CUDA_ADVANCE_ALL_CUH_
 
+#include "./cuda_common.cuh"
+
 namespace minigun {
 namespace advance {
 
@@ -13,14 +15,14 @@ __device__ __forceinline__ mg_int BinarySearchSrc(const IntArray1D& array, mg_in
   mg_int lo = 0, hi = array.length - 1;
   while (lo < hi) {
     mg_int mid = (lo + hi) >> 1;
-    if (array.data[mid] < eid) {
+    if (_ldg(array.data + mid) < eid) {
       lo = mid + 1;
     } else {
       hi = mid;
     }
   }
   // INVARIANT: lo == hi
-  if (array.data[hi] == eid) {
+  if (_ldg(array.data + hi) == eid) {
     return hi;
   } else {
     return hi - 1;
@@ -41,7 +43,7 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     // TODO(minjie): this is pretty inefficient; binary search is needed only
     //   when the thread is processing the neighbor list of a new node.
     mg_int src = BinarySearchSrc(csr.row_offsets, eid);
-    mg_int dst = csr.column_indices.data[eid];
+    mg_int dst = _ldg(csr.column_indices.data + eid);
     if (Functor::CondEdge(src, dst, eid, gdata)) {
       Functor::ApplyEdge(src, dst, eid, gdata);
       // Add dst/eid to output frontier
@@ -79,7 +81,7 @@ void CudaAdvanceAllGunrockLBOut(
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
   //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-  //  << nthrs.x << "," << nthrs.y << ")";
+    //<< nthrs.x << "," << nthrs.y << ")";
   CudaAdvanceAllGunrockLBOutKernel<Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, gdata, output_frontier);
 }
