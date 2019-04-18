@@ -5,62 +5,34 @@
 
 #include <minigun/minigun.h>
 #include "./baseline/yzh_kernels.cuh"
+#include "./minigun/spmm.cuh"
 #include "../samples_io.h"
 #include "../samples_utils.h"
 
 using minigun::advance::RuntimeConfig;
+using namespace spmm;
 
-struct GData {
-  int D = 0;  // feat size
-  int H = 0;  // num heads
-  float* ndata{nullptr};  // N*H*D
-  float* weight{nullptr}; // M*H
-  float* out{nullptr};    // N*H*D
-};
+double RunMinigun(const utils::SampleCsr& scsr,
+                  const minigun::Csr& csr,
+                  mg_int feat_size, mg_int num_heads) {
+  // gdata
+  GData gdata, truth;
+  gdata.D = feat_size;
+  gdata.H = num_heads;
+  InitGData(scsr, &gdata, &truth);
+  GData* d_gdata;
+  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData)));
+  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaDeviceSynchronize());
+ 
+  // create stream
+  RuntimeConfig rtcfg;
+  rtcfg.ctx = {kDLGPU, 0};
+  int nt = utils::_FindNumThreads(gdata.H * gdata.D, 64);
+  rtcfg.data_num_threads = nt;
+  rtcfg.data_num_blocks = (gdata.H * gdata.D + (nt * 4) - 1) / (nt * 4);
+  CUDA_CALL(cudaStreamCreate(&rtcfg.stream));
 
-struct SPMMFunctor {
-  static __device__ __forceinline__ bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    return true;
-  }
-  static __device__ __forceinline__ void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    const int D = gdata->D;
-    const int H = gdata->H;
-    // each thread handles one attention head
-    mg_int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    mg_int stride_x = blockDim.x * gridDim.x;
-    float* srcoff = gdata->ndata + (src * H * D);
-    float* eidoff = gdata->weight + (eid * H);
-    float* outoff = gdata->out + (dst * H * D);
-    while (tx < D * H) {
-      const int h = tx / D;
-      atomicAdd(outoff + tx, __ldg(srcoff + tx) * __ldg(eidoff + h));
-      tx += stride_x;
-    }
-  }
-};
-
-void InitGData(GData* gdata, mg_int N, mg_int M) {
-  std::vector<float> ndata(N * gdata->D * gdata->H), weight(M * gdata->H, 0.), out(N * gdata->D * gdata->H, 0.);
-  for (mg_int i = 0; i < ndata.size(); ++i) {
-    ndata[i] = (float)rand() / RAND_MAX;
-  }
-  for (mg_int i = 0; i < weight.size(); ++i) {
-    weight[i] = (float)rand() / RAND_MAX;
-  }
-  CUDA_CALL(cudaMalloc(&(gdata->ndata), sizeof(float) * ndata.size()));
-  CUDA_CALL(cudaMemcpy(gdata->ndata, &ndata[0],
-        sizeof(float) * ndata.size(), cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMalloc(&(gdata->out), sizeof(float) * out.size()));
-  CUDA_CALL(cudaMemcpy(gdata->out, &out[0],
-        sizeof(float) * out.size(), cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMalloc(&(gdata->weight), sizeof(float) * weight.size()));
-  CUDA_CALL(cudaMemcpy(gdata->weight, &weight[0],
-        sizeof(float) * weight.size(), cudaMemcpyHostToDevice));
-}
-
-double RunMinigun(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* d_gdata) {
   minigun::IntArray1D infront, outfront;
 
   // dry run
@@ -68,6 +40,7 @@ double RunMinigun(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* d_
   minigun::advance::Advance<kDLGPU, Config, GData, SPMMFunctor>(
       rtcfg, csr, d_gdata, infront, outfront);
   CUDA_CALL(cudaDeviceSynchronize());
+  CheckResult(scsr, &gdata, &truth);
 
   const int K = 10;
   timeval t0, t1;
@@ -81,20 +54,30 @@ double RunMinigun(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* d_
   double dur = (double)(t1.tv_sec * 1e6 + t1.tv_usec -
       (t0.tv_sec * 1e6 + t0.tv_usec)) / K / 1000.0;  // ms
 
+  FreeGData(&gdata, &truth);
+
   return dur;
 }
 
-double RunBaseline1(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* gdata) {
+double RunBaseline1(const utils::SampleCsr& scsr,
+                    const minigun::Csr& csr,
+                    mg_int feat_size, mg_int num_heads) {
   const mg_int N = csr.row_offsets.length - 1;
+
+   // gdata
+  GData gdata, truth;
+  gdata.D = feat_size;
+  gdata.H = num_heads;
+  InitGData(scsr, &gdata, &truth);
 
   // dry run
   custom_kernel::vector_spmm_forward_kernel_no_eid<mg_int, float><<<N, 32>>>(
       csr.row_offsets.data,
       csr.column_indices.data,
-      gdata->weight,
-      gdata->ndata,
-      gdata->out,
-      (int)gdata->D, (int)N, (int)gdata->H);
+      gdata.weight,
+      gdata.ndata,
+      gdata.out,
+      (int)gdata.D, (int)N, (int)gdata.H);
   CUDA_CALL(cudaDeviceSynchronize());
 
   const int K = 10;
@@ -104,15 +87,17 @@ double RunBaseline1(const RuntimeConfig& rtcfg, const minigun::Csr& csr, GData* 
     custom_kernel::vector_spmm_forward_kernel_no_eid<mg_int, float><<<N, 32>>>(
         csr.row_offsets.data,
         csr.column_indices.data,
-        gdata->weight,
-        gdata->ndata,
-        gdata->out,
-        (int)gdata->D, (int)N, (int)gdata->H);
+        gdata.weight,
+        gdata.ndata,
+        gdata.out,
+        (int)gdata.D, (int)N, (int)gdata.H);
   }
   CUDA_CALL(cudaDeviceSynchronize());
   gettimeofday(&t1, nullptr);
   double dur = (double)(t1.tv_sec * 1e6 + t1.tv_usec -
       (t0.tv_sec * 1e6 + t0.tv_usec)) / K / 1000.0;  // ms
+
+  FreeGData(&gdata, &truth);
 
   return dur;
 }
@@ -138,27 +123,9 @@ int main(int argc, char** argv) {
   // csr
   minigun::Csr csr = utils::ToMinigunCsr(scsr, kDLGPU);
 
-  // gdata
-  GData gdata;
-  gdata.D = feat_size;
-  gdata.H = num_heads;
-  InitGData(&gdata, N, M);
-  GData* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData), cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaDeviceSynchronize());
-  
-  // create stream
-  RuntimeConfig cfg;
-  cfg.ctx = {kDLGPU, 0};
-  int nt = utils::_FindNumThreads(gdata.H * gdata.D, 64);
-  cfg.data_num_threads = nt;
-  cfg.data_num_blocks = (gdata.H * gdata.D + (nt * 4) - 1) / (nt * 4);
-  CUDA_CALL(cudaStreamCreate(&cfg.stream));
-
-  double dur1 = RunMinigun(cfg, csr, d_gdata);
+  double dur1 = RunMinigun(scsr, csr, feat_size, num_heads);
   std::cout << "minigun time(ms): " << dur1 << std::endl;
-  double dur2 = RunBaseline1(cfg, csr, &gdata);
+  double dur2 = RunBaseline1(scsr, csr, feat_size, num_heads);
   std::cout << "baseline1 time(ms): " << dur2 << std::endl;
 
   return 0;

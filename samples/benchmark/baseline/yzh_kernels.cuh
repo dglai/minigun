@@ -219,28 +219,6 @@ __global__ void sparse_softmax_backward_kernel(
   }
 }
 
-template <typename idx_t, typename data_t>
-__global__ void sparse_softmax_backward_kernel_no_eid(
-    const idx_t* __restrict__ indptr,
-    const data_t* __restrict__ dy,
-    const data_t* __restrict__ y,
-    data_t* __restrict__ dx,
-    const int n, const int h) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  int ty = threadIdx.y;
-  int tz = threadIdx.z;
-  if (i < n) {
-    for (int kj = indptr[i] + ty; kj < indptr[i + 1]; kj += blockDim.y) {
-      data_t dsum = 0;
-      for (int ki = indptr[i]; ki < indptr[i + 1]; ++ki) {
-        dsum -= dy[ki * h + tz] * y[ki * h + tz] * y[kj * h + tz];
-        if (ki == kj) dsum += dy[ki * h + tz] * y[ki * h + tz];
-      }
-      dx[kj * h + tz] = dsum;
-    }
-  }
-}
-
 } // end of namespace
 
 #endif
