@@ -2,8 +2,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <limits>
-#include <time.h>
-#include <omp.h>
+#include <dmlc/omp.h>
+#include <chrono>
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
@@ -24,7 +24,6 @@ struct EdgeMax {
   static inline void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
     const mg_int dim = gdata->dim;
-#pragma omp parallel for
     for (mg_int fid = 0; fid < dim; ++fid) {
 #pragma omp critical
       gdata->max[dst * dim + fid] = std::max(gdata->max[dst * dim + fid],
@@ -42,7 +41,6 @@ struct MinuxMaxExpSum {
   static inline void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
     const mg_int dim = gdata->dim;
-#pragma omp parallel for
     for (mg_int fid = 0; fid < dim; ++fid) {
       gdata->score[eid * dim + fid] = expf(gdata->score[eid * dim + fid] - gdata->max[dst * dim + fid]);
 #pragma omp atomic
@@ -60,7 +58,6 @@ struct Norm {
   static inline void ApplyEdge(
       mg_int src, mg_int dst, mg_int eid, GData* gdata) {
     const mg_int dim = gdata->dim;
-#pragma omp parallel for
     for (mg_int fid = 0; fid < dim; ++fid) {
       gdata->score[eid * dim + fid] /= gdata->sum[dst * dim + fid];
     }
@@ -150,5 +147,27 @@ int main(int argc, char** argv) {
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, evec) << std::endl;
 
+  const int K = 10;
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLCPU, Config, GData, EdgeMax>(
+        config, csr, &gdata, infront, outfront);
+    minigun::advance::Advance<kDLCPU, Config, GData, MinuxMaxExpSum>(
+        config, csr, &gdata, infront, outfront);
+    minigun::advance::Advance<kDLCPU, Config, GData, Norm>(
+        config, csr, &gdata, infront, outfront);
+  }
+
+  auto start = std::chrono::system_clock::now();
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLCPU, Config, GData, EdgeMax>(
+        config, csr, &gdata, infront, outfront);
+    minigun::advance::Advance<kDLCPU, Config, GData, MinuxMaxExpSum>(
+        config, csr, &gdata, infront, outfront);
+    minigun::advance::Advance<kDLCPU, Config, GData, Norm>(
+        config, csr, &gdata, infront, outfront);
+  }
+  auto end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  std::cout << "Time(ms): " << elapsed_seconds.count() * 1e3 / K << std::endl;
   return 0;
 }

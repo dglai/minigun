@@ -2,47 +2,124 @@
 #define MINIGUN_CPU_ADVANCE_H_
 
 #include "../advance.h"
-#include <omp.h>
+#include <dmlc/omp.h>
 
 namespace minigun {
 namespace advance {
 
-// Binary search the row_offsets to find the source node of the edge id.
-static inline mg_int CPUBinarySearchSrc(const IntArray1D& array, mg_int eid) {
-  mg_int lo = 0, hi = array.length - 1;
-  while (lo < hi) {
-    mg_int mid = (lo + hi) >> 1;
-    if (array.data[mid] < eid) {
-      lo = mid + 1;
-    } else {
-      hi = mid;
+template <typename Alloc>
+void ComputeOutputLength(Csr csr,
+                         IntArray1D input_frontier,
+                         IntArray1D* lcl_row_offsets,
+                         mg_int* outlen,
+                         Alloc* alloc) {
+  IntArray1D edge_counts;
+  lcl_row_offsets->data[0] = 0;
+  edge_counts.length = input_frontier.length;
+  edge_counts.data = alloc->template AllocateWorkspace<mg_int>(
+      edge_counts.length * sizeof(mg_int));
+#pragma omp parallel for
+  for (mg_int tid = 0; tid < edge_counts.length; ++tid) {
+    const mg_int vid = input_frontier.data[tid];
+    edge_counts.data[tid] = csr.row_offsets.data[vid + 1] -
+      csr.row_offsets.data[vid];
+  }
+
+  // prefix sum with openmp
+  mg_int* thread_sum;
+#pragma omp parallel
+  {
+    const mg_int tid = omp_get_thread_num();
+    const mg_int ntr = omp_get_num_threads();
+
+    // only one thread should allocate workspace
+#pragma omp single
+    {
+      thread_sum = alloc->template AllocateWorkspace<mg_int>(ntr *
+          sizeof(mg_int));
+    }
+
+    // each thread calculates one chunk of partial sum
+    mg_int sum = 0;
+#pragma omp for schedule(static)
+    for (mg_int vid = 0; vid < edge_counts.length; ++vid) {
+      sum += edge_counts.data[vid];
+      lcl_row_offsets->data[vid + 1] = sum;
+    }
+    thread_sum[tid] = sum;
+#pragma omp barrier
+    // fix partial sum in each chunk by adding offsets
+    mg_int offset = 0;
+    for (mg_int i = 0; i < tid; ++i) {
+      offset += thread_sum[i];
+    }
+#pragma omp for schedule(static)
+    for (mg_int vid = 0; vid < edge_counts.length; ++vid) {
+      lcl_row_offsets->data[vid + 1] += offset;
     }
   }
-  // INVARIANT: lo == hi
-  if (array.data[hi] == eid) {
-    return hi;
-  } else {
-    return hi - 1;
-  }
+
+  alloc->FreeWorkspace(edge_counts.data);
+  alloc->FreeWorkspace(thread_sum);
+  *outlen = lcl_row_offsets->data[edge_counts.length];
 }
 
 template <typename Config,
           typename GData,
-          typename Functor>
-void CPUAdvanceKernel(
-    Csr csr,  // pass by value to make sure it is copied to device memory
-    GData* gdata,
-    IntArray1D input_frontier,
-    IntArray1D output_frontier) {
+          typename Functor,
+          typename Alloc>
+void CPUAdvance(Csr csr,
+                GData* gdata,
+                IntArray1D input_frontier,
+                IntArray1D output_frontier,
+                IntArray1D lcl_row_offsets,
+                Alloc* alloc) {
+  mg_int N;
+  if (Config::kAdvanceAll) {
+    N = csr.row_offsets.length - 1;
+  } else {
+    N = input_frontier.length;
+  }
 #pragma omp parallel for
-  for (mg_int eid = 0; eid < csr.column_indices.length; ++eid) {
-    mg_int src = CPUBinarySearchSrc(csr.row_offsets, eid);
-    mg_int dst = csr.column_indices.data[eid];
-    if (Functor::CondEdge(src, dst, eid, gdata)) {
-      Functor::ApplyEdge(src, dst, eid, gdata);
+  for (mg_int vid = 0; vid < N; ++vid) {
+    mg_int src = vid;
+    if (!Config::kAdvanceAll) {
+      src = input_frontier.data[vid];
+    }
+    const mg_int row_start = csr.row_offsets.data[src];
+    const mg_int row_end = csr.row_offsets.data[src + 1];
+    for (mg_int eid = row_start; eid < row_end; ++eid) {
+      const mg_int dst = csr.column_indices.data[eid];
+      if (Functor::CondEdge(src, dst, eid, gdata)) {
+        Functor::ApplyEdge(src, dst, eid, gdata);
+        if (Config::kMode != kV2N && Config::kMode != kE2N) {
+
+          mg_int out_idx;
+          if (Config::kAdvanceAll) {
+            out_idx = eid;
+          } else {
+            out_idx = eid - row_start + lcl_row_offsets.data[vid];
+          }
+          if (Config::kMode == kV2V || Config::kMode == kE2V) {
+            output_frontier.data[out_idx] = dst;
+          } else {
+            output_frontier.data[out_idx] = eid;
+          }
+        }
+      } else {
+        if (Config::kMode != kV2N && Config::kMode != kE2N) {
+          mg_int out_idx;
+          if (Config::kAdvanceAll) {
+            out_idx = eid;
+          } else {
+            out_idx = eid - row_start + lcl_row_offsets.data[vid];
+          }
+          output_frontier.data[out_idx] = kInvalid;
+        }
+      }
     }
   }
-};
+}
 
 template <typename Config,
           typename GData,
@@ -56,8 +133,36 @@ struct DispatchXPU<kDLCPU, Config, GData, Functor, Alloc> {
       IntArray1D input_frontier,
       IntArray1D output_frontier,
       Alloc* alloc) {
-    //CHECK(output_frontier.length != 0);
-    CPUAdvanceKernel<Config, GData, Functor>(csr, gdata, input_frontier, output_frontier);
+    if (Config::kMode != kV2V && Config::kMode != kV2E
+        && Config::kMode != kV2N) {
+      LOG(FATAL) << "Advance from edge not supported for CPU";
+    }
+    IntArray1D lcl_row_offsets;
+    if (Config::kAdvanceAll) {
+      lcl_row_offsets = csr.row_offsets;
+      output_frontier.length = csr.column_indices.length;
+    } else {
+      if (Config::kMode != kV2N && Config::kMode != kE2N) {
+        lcl_row_offsets.length = input_frontier.length + 1;
+        lcl_row_offsets.data = alloc->template AllocateWorkspace<mg_int>(
+            lcl_row_offsets.length * sizeof(mg_int));
+        ComputeOutputLength<Alloc>(csr, input_frontier, &lcl_row_offsets,
+            &output_frontier.length, alloc);
+      }
+    }
+    if (Config::kMode != kV2N && Config::kMode != kE2N &&
+        output_frontier.data == nullptr) {
+      output_frontier.data = alloc->template AllocateData<mg_int>(
+          output_frontier.length * sizeof(mg_int));
+    }
+
+    CPUAdvance<Config, GData, Functor, Alloc>(
+        csr, gdata, input_frontier, output_frontier, lcl_row_offsets, alloc);
+
+    if (!Config::kAdvanceAll && Config::kMode != kV2N
+        && Config::kMode != kE2N) {
+      alloc->FreeWorkspace(lcl_row_offsets.data);
+    }
   }
 };
 
