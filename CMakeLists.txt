@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
-project(minigun-samples C CXX)
+project(minigun C CXX)
+
+message(STATUS "Start configuring project ${PROJECT_NAME}")
 
 # find packages
 include(cmake/util/Util.cmake)
@@ -14,7 +16,8 @@ else()
   endif()
 endif()
 
-dgl_option(USE_CUDA "Build with CUDA" ON)
+minigun_option(USE_CUDA "Build with CUDA" ON)
+minigun_option(BUILD_SAMPLES "Build minigun samples" OFF)
 
 # include directories
 include_directories("minigun")
@@ -58,5 +61,7 @@ include(cmake/modules/CUDA.cmake)
 
 file(GLOB_RECURSE MINIGUN_SRC "minigun/minigun/*.h")
 
-add_subdirectory(third_party/dmlc-core)
-add_subdirectory(samples)
+if(BUILD_SAMPLES)
+  add_subdirectory(third_party/dmlc-core)
+  add_subdirectory(samples)
+endif(BUILD_SAMPLES)
