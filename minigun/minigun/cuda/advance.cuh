@@ -18,19 +18,6 @@ namespace advance {
 #define MAX_NTHREADS 1024
 #define MAX_NBLOCKS 65535L
 
-__inline__ void PrintDev(IntArray1D arr) {
-  mg_int* tmp = new mg_int[arr.length];
-  CUDA_CALL(cudaMemcpy(tmp, arr.data, sizeof(mg_int) * arr.length, cudaMemcpyDeviceToHost));
-  std::ostringstream oss;
-  oss << "[";
-  for (mg_int i = 0; i < arr.length; ++i) {
-    oss << tmp[i] << ", ";
-  }
-  oss << "]";
-  LOG(INFO) << oss.str();
-  delete [] tmp;
-}
-
 struct StridedIterator :
   mgpu::const_iterator_t<StridedIterator, int, mg_int> {
 
