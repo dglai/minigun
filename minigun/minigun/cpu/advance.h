@@ -8,11 +8,10 @@ namespace minigun {
 namespace advance {
 
 template <typename Alloc>
-void ComputeOutputLength(Csr csr,
-                         IntArray1D input_frontier,
-                         IntArray1D* lcl_row_offsets,
-                         mg_int* outlen,
-                         Alloc* alloc) {
+mg_int ComputeOutputLength(Csr csr,
+                           IntArray1D input_frontier,
+                           IntArray1D* lcl_row_offsets,
+                           Alloc* alloc) {
   IntArray1D edge_counts;
   lcl_row_offsets->data[0] = 0;
   edge_counts.length = input_frontier.length;
@@ -61,7 +60,7 @@ void ComputeOutputLength(Csr csr,
 
   alloc->FreeWorkspace(edge_counts.data);
   alloc->FreeWorkspace(thread_sum);
-  *outlen = lcl_row_offsets->data[edge_counts.length];
+  return lcl_row_offsets->data[edge_counts.length];
 }
 
 template <typename Config,
@@ -131,33 +130,42 @@ struct DispatchXPU<kDLCPU, Config, GData, Functor, Alloc> {
       const Csr& csr,
       GData* gdata,
       IntArray1D input_frontier,
-      IntArray1D output_frontier,
+      IntArray1D* output_frontier,
       Alloc* alloc) {
     if (Config::kMode != kV2V && Config::kMode != kV2E
         && Config::kMode != kV2N) {
       LOG(FATAL) << "Advance from edge not supported for CPU";
     }
     IntArray1D lcl_row_offsets;
+    mg_int out_len = 0;
     if (Config::kAdvanceAll) {
       lcl_row_offsets = csr.row_offsets;
-      output_frontier.length = csr.column_indices.length;
+      out_len = csr.column_indices.length;
     } else {
       if (Config::kMode != kV2N && Config::kMode != kE2N) {
         lcl_row_offsets.length = input_frontier.length + 1;
         lcl_row_offsets.data = alloc->template AllocateWorkspace<mg_int>(
             lcl_row_offsets.length * sizeof(mg_int));
-        ComputeOutputLength<Alloc>(csr, input_frontier, &lcl_row_offsets,
-            &output_frontier.length, alloc);
+        out_len = ComputeOutputLength<Alloc>(
+            csr, input_frontier, &lcl_row_offsets, alloc);
       }
     }
-    if (Config::kMode != kV2N && Config::kMode != kE2N &&
-        output_frontier.data == nullptr) {
-      output_frontier.data = alloc->template AllocateData<mg_int>(
-          output_frontier.length * sizeof(mg_int));
+    if (output_frontier) {
+      if (output_frontier->data == nullptr) {
+        // The output frontier buffer should be allocated.
+        output_frontier->length = out_len;
+        output_frontier->data = alloc->template AllocateData<mg_int>(
+            output_frontier->length * sizeof(mg_int));
+      } else {
+        CHECK_GE(output_frontier->length, out_len)
+          << "Require output frontier of length " << out_len
+          << " but only got a buffer of length " << output_frontier->length;
+      }
     }
 
+    IntArray1D outbuf = (output_frontier)? *output_frontier : IntArray1D();
     CPUAdvance<Config, GData, Functor, Alloc>(
-        csr, gdata, input_frontier, output_frontier, lcl_row_offsets, alloc);
+        csr, gdata, input_frontier, outbuf, lcl_row_offsets, alloc);
 
     if (!Config::kAdvanceAll && Config::kMode != kV2N
         && Config::kMode != kE2N) {

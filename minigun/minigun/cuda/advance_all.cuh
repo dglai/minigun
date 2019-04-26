@@ -95,20 +95,27 @@ void CudaAdvanceAll(
     const RuntimeConfig& rtcfg,
     const Csr& csr,
     GData* gdata,
-    IntArray1D output_frontier,
+    IntArray1D* output_frontier,
     Alloc* alloc) {
-  if (Config::kMode != kV2N && Config::kMode != kE2N
-      && output_frontier.data == nullptr) {
-    // Allocate output frointer buffer, the length is equal to the number
-    // of edges.
-    output_frontier.length = csr.column_indices.length;
-    output_frontier.data = alloc->template AllocateData<mg_int>(
-        output_frontier.length * sizeof(mg_int));
+  mg_int out_len = csr.column_indices.length;
+  if (output_frontier) {
+    if (output_frontier->data == nullptr) {
+      // Allocate output frointer buffer, the length is equal to the number
+      // of edges.
+      output_frontier->length = out_len;
+      output_frontier->data = alloc->template AllocateData<mg_int>(
+          output_frontier->length * sizeof(mg_int));
+    } else {
+      CHECK_GE(output_frontier->length, out_len)
+        << "Require output frontier of length " << out_len
+        << " but only got a buffer of length " << output_frontier->length;
+    }
   }
+  IntArray1D outbuf = (output_frontier)? *output_frontier : IntArray1D();
   switch (algo) {
     case kGunrockLBOut :
       CudaAdvanceAllGunrockLBOut<Config, GData, Functor, Alloc>(
-          rtcfg, csr, gdata, output_frontier, alloc);
+          rtcfg, csr, gdata, outbuf, alloc);
       break;
     default:
       LOG(FATAL) << "Algorithm " << algo << " is not supported.";

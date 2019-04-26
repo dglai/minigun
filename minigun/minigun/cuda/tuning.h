@@ -18,8 +18,7 @@ template <typename Config>
 AdvanceAlg FindAdvanceAlgo(
     const RuntimeConfig& rtcfg,
     const Csr& csr,
-    const IntArray1D& input_frontier,
-    const IntArray1D& output_frontier) {
+    const IntArray1D& input_frontier) {
   // TODO(minjie): more
   return kGunrockLBOut;
 }

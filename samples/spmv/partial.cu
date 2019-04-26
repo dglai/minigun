@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<false, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
-      config, csr, d_gdata, infront, outfront,
+      config, csr, d_gdata, infront, &outfront,
       utils::GPUAllocator::Get());
 
   CUDA_CALL(cudaDeviceSynchronize());
@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
-        config, csr, d_gdata, infront, outfront,
+        config, csr, d_gdata, infront, &outfront,
         utils::GPUAllocator::Get());
   }
   CUDA_CALL(cudaDeviceSynchronize());

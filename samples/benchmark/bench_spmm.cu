@@ -33,12 +33,12 @@ double RunMinigun(const utils::SampleCsr& scsr,
   rtcfg.data_num_blocks = (gdata.H * gdata.D + (nt * 4) - 1) / (nt * 4);
   CUDA_CALL(cudaStreamCreate(&rtcfg.stream));
 
-  minigun::IntArray1D infront, outfront;
+  minigun::IntArray1D infront;
 
   // dry run
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, Config, GData, SPMMFunctor>(
-      rtcfg, csr, d_gdata, infront, outfront);
+      rtcfg, csr, d_gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -47,7 +47,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, Config, GData, SPMMFunctor>(
-        rtcfg, csr, d_gdata, infront, outfront);
+        rtcfg, csr, d_gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
   gettimeofday(&t1, nullptr);
