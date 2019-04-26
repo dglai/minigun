@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
 
   // copy graph to gpu
   minigun::Csr csr;
-  minigun::IntArray1D infront, outfront;
+  minigun::IntArray1D infront;
   csr.row_offsets.length = row_offsets.size();
   csr.row_offsets.data = &row_offsets[0];
   csr.column_indices.length = column_indices.size();
@@ -138,11 +138,11 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLCPU, Config, GData, EdgeMax>(
-      config, csr, &gdata, infront, outfront);
+      config, csr, &gdata, infront);
   minigun::advance::Advance<kDLCPU, Config, GData, MinuxMaxExpSum>(
-      config, csr, &gdata, infront, outfront);
+      config, csr, &gdata, infront);
   minigun::advance::Advance<kDLCPU, Config, GData, Norm>(
-      config, csr, &gdata, infront, outfront);
+      config, csr, &gdata, infront);
 
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, evec) << std::endl;
@@ -150,21 +150,21 @@ int main(int argc, char** argv) {
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, Config, GData, EdgeMax>(
-        config, csr, &gdata, infront, outfront);
+        config, csr, &gdata, infront);
     minigun::advance::Advance<kDLCPU, Config, GData, MinuxMaxExpSum>(
-        config, csr, &gdata, infront, outfront);
+        config, csr, &gdata, infront);
     minigun::advance::Advance<kDLCPU, Config, GData, Norm>(
-        config, csr, &gdata, infront, outfront);
+        config, csr, &gdata, infront);
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, Config, GData, EdgeMax>(
-        config, csr, &gdata, infront, outfront);
+        config, csr, &gdata, infront);
     minigun::advance::Advance<kDLCPU, Config, GData, MinuxMaxExpSum>(
-        config, csr, &gdata, infront, outfront);
+        config, csr, &gdata, infront);
     minigun::advance::Advance<kDLCPU, Config, GData, Norm>(
-        config, csr, &gdata, infront, outfront);
+        config, csr, &gdata, infront);
   }
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;

@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<false, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
-      config, csr, &gdata, infront, outfront,
+      config, csr, &gdata, infront, &outfront,
       utils::CPUAllocator::Get());
 
   // verify output
@@ -101,14 +101,14 @@ int main(int argc, char** argv) {
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
-        config, csr, &gdata, infront, outfront,
+        config, csr, &gdata, infront, &outfront,
         utils::CPUAllocator::Get());
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
-        config, csr, &gdata, infront, outfront,
+        config, csr, &gdata, infront, &outfront,
         utils::CPUAllocator::Get());
   }
   auto end = std::chrono::system_clock::now();

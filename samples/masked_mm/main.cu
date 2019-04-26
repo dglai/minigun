@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
   // copy graph to gpu
   CUDA_CALL(cudaSetDevice(0));
   minigun::Csr csr;
-  minigun::IntArray1D infront, outfront;
+  minigun::IntArray1D infront;
   csr.row_offsets.length = row_offsets.size();
   CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(mg_int) * row_offsets.size()));
   CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &row_offsets[0],
@@ -96,9 +96,6 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemcpy(gdata.ndata, &vvec[0], sizeof(float) * N * D, cudaMemcpyHostToDevice));
   CUDA_CALL(cudaMalloc(&gdata.edata, sizeof(float) * M));
   CUDA_CALL(cudaMemcpy(gdata.edata, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
-  GData* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData), cudaMemcpyHostToDevice));
 
   CUDA_CALL(cudaDeviceSynchronize());
 
@@ -108,7 +105,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, Config, GData, MaskedMMFunctor>(
-      config, csr, d_gdata, infront, outfront);
+      config, csr, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 

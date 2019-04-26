@@ -63,7 +63,7 @@ struct DispatchXPU {
       const Csr& csr,
       GData* gdata,
       IntArray1D input_frontier,
-      IntArray1D output_frontier,
+      IntArray1D* output_frontier,
       Alloc* alloc) {
     LOG(FATAL) << "Not implemented for XPU: " << XPU;
   }
@@ -72,6 +72,21 @@ struct DispatchXPU {
 
 /*
  * !\brief Advance kernel.
+ *
+ * \tparam XPU The computing device type (DLDeviceType)
+ * \tparam Config The static configuration of advance kernel.
+ * \tparam GData The user-defined graph data.
+ * \tparam Functor The user-defined functions.
+ * \tparam Alloc The external allocator type.
+ * \param config Runtime configuration of this advance kernel.
+ * \param csr The graph csr structure.
+ * \param gdata The pointer to the user-defined graph data structure.
+ *              This pointer must be a host pointer and it will be
+ *              dereferenced and its content will be copied to the
+ *              device for execution.
+ * \param input_frontier The input frontier array. Could be empty.
+ * \param output_frontier The pointer to the output frontier array.
+ * \param alloc The external memory allocator.
  */
 template <int XPU,
           typename Config,
@@ -82,8 +97,12 @@ void Advance(const RuntimeConfig& config,
              const Csr& csr,
              GData* gdata,
              IntArray1D input_frontier,
-             IntArray1D output_frontier,
+             IntArray1D* output_frontier = nullptr,
              Alloc* alloc = DefaultAllocator<XPU>::Get()) {
+  if (Config::kMode != kV2N && Config::kMode != kE2N
+      && output_frontier == nullptr) {
+    LOG(FATAL) << "Require computing output frontier but no buffer is provided.";
+  }
   DispatchXPU<XPU, Config, GData, Functor, Alloc>::Advance(
       config, csr, gdata,
       input_frontier, output_frontier, alloc);
