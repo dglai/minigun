@@ -33,8 +33,8 @@ template <typename Config,
           typename GData,
           typename Functor>
 __global__ void CudaAdvanceAllGunrockLBOutKernel(
-    Csr csr,  // pass by value to make sure it is copied to device memory
-    GData* gdata,
+    Csr csr,
+    GData gdata,
     IntArray1D output_frontier) {
   mg_int ty = blockIdx.y * blockDim.y + threadIdx.y;
   mg_int stride_y = blockDim.y * gridDim.y;
@@ -44,8 +44,8 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     //   when the thread is processing the neighbor list of a new node.
     mg_int src = BinarySearchSrc(csr.row_offsets, eid);
     mg_int dst = _ldg(csr.column_indices.data + eid);
-    if (Functor::CondEdge(src, dst, eid, gdata)) {
-      Functor::ApplyEdge(src, dst, eid, gdata);
+    if (Functor::CondEdge(src, dst, eid, &gdata)) {
+      Functor::ApplyEdge(src, dst, eid, &gdata);
       // Add dst/eid to output frontier
       if (Config::kMode == kV2V || Config::kMode == kE2V) {
         output_frontier.data[eid] = dst;
@@ -83,7 +83,7 @@ void CudaAdvanceAllGunrockLBOut(
   //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
     //<< nthrs.x << "," << nthrs.y << ")";
   CudaAdvanceAllGunrockLBOutKernel<Config, GData, Functor>
-    <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, gdata, output_frontier);
+    <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata, output_frontier);
 }
 
 template <typename Config,

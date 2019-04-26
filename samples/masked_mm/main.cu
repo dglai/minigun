@@ -96,9 +96,6 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemcpy(gdata.ndata, &vvec[0], sizeof(float) * N * D, cudaMemcpyHostToDevice));
   CUDA_CALL(cudaMalloc(&gdata.edata, sizeof(float) * M));
   CUDA_CALL(cudaMemcpy(gdata.edata, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
-  GData* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData), cudaMemcpyHostToDevice));
 
   CUDA_CALL(cudaDeviceSynchronize());
 
@@ -108,7 +105,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, Config, GData, MaskedMMFunctor>(
-      config, csr, d_gdata, infront);
+      config, csr, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 

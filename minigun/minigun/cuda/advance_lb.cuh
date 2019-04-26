@@ -45,7 +45,7 @@ template <int N_SMEM_ELEMENTS,
           typename Functor>
 __global__ void CUDAAdvanceLBKernel(
     Csr csr,
-    GData* gdata,
+    GData gdata,
     IntArray1D input_frontier,
     IntArray1D output_frontier,
     IntArray1D lcl_row_offsets,
@@ -108,8 +108,8 @@ __global__ void CUDAAdvanceLBKernel(
       const mg_int eid = s_glb_row_offsets[s_lclsrc] + veid;
       const mg_int dst = _ldg(csr.column_indices.data + eid);
       //printf("%ld %ld %ld %ld %ld\n", out_item, s_lclsrc, src, eid, dst);
-      if (Functor::CondEdge(src, dst, eid, gdata)) {
-        Functor::ApplyEdge(src, dst, eid, gdata);
+      if (Functor::CondEdge(src, dst, eid, &gdata)) {
+        Functor::ApplyEdge(src, dst, eid, &gdata);
         // Add dst/eid to output frontier
         if (Config::kMode == kV2V || Config::kMode == kE2V) {
           output_frontier.data[out_item] = dst;

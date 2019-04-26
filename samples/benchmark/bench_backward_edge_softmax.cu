@@ -20,9 +20,6 @@ double RunMinigun(const utils::SampleCsr& scsr,
   GData gdata, truth;
   gdata.H = num_heads;
   InitGData(scsr, &gdata, &truth);
-  GData* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData), cudaMemcpyHostToDevice));
   CUDA_CALL(cudaDeviceSynchronize());
  
   // create stream
@@ -38,9 +35,9 @@ double RunMinigun(const utils::SampleCsr& scsr,
   // dry run
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, Config, GData, BackSoftmaxAccum>(
-      rtcfg, csr, d_gdata, infront);
+      rtcfg, csr, &gdata, infront);
   minigun::advance::Advance<kDLGPU, Config, GData, BackSoftmaxMinus>(
-      rtcfg, csr, d_gdata, infront);
+      rtcfg, csr, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -49,9 +46,9 @@ double RunMinigun(const utils::SampleCsr& scsr,
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, Config, GData, BackSoftmaxAccum>(
-        rtcfg, csr, d_gdata, infront);
+        rtcfg, csr, &gdata, infront);
     minigun::advance::Advance<kDLGPU, Config, GData, BackSoftmaxMinus>(
-        rtcfg, csr, d_gdata, infront);
+        rtcfg, csr, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
   gettimeofday(&t1, nullptr);

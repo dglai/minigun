@@ -155,32 +155,32 @@ class CudaAdvanceExecutor {
     if (ty > 512) {
       CUDAAdvanceLBKernel<1024, Config, GData, Functor>
         <<<nblks, nthrs, 0, rtcfg_.stream>>>(
-            csr_, gdata_, input_frontier_, outbuf,
+            csr_, *gdata_, input_frontier_, outbuf,
             lcl_row_offsets, nparts_per_blk, partition_starts);
     } else if (ty > 256) {
       CUDAAdvanceLBKernel<512, Config, GData, Functor>
         <<<nblks, nthrs, 0, rtcfg_.stream>>>(
-            csr_, gdata_, input_frontier_, outbuf,
+            csr_, *gdata_, input_frontier_, outbuf,
             lcl_row_offsets, nparts_per_blk, partition_starts);
     } else if (ty > 128) {
       CUDAAdvanceLBKernel<256, Config, GData, Functor>
         <<<nblks, nthrs, 0, rtcfg_.stream>>>(
-            csr_, gdata_, input_frontier_, outbuf,
+            csr_, *gdata_, input_frontier_, outbuf,
             lcl_row_offsets, nparts_per_blk, partition_starts);
     } else if (ty > 64) {
       CUDAAdvanceLBKernel<128, Config, GData, Functor>
         <<<nblks, nthrs, 0, rtcfg_.stream>>>(
-            csr_, gdata_, input_frontier_, outbuf,
+            csr_, *gdata_, input_frontier_, outbuf,
             lcl_row_offsets, nparts_per_blk, partition_starts);
     } else if (ty > 32) {
       CUDAAdvanceLBKernel<64, Config, GData, Functor>
         <<<nblks, nthrs, 0, rtcfg_.stream>>>(
-            csr_, gdata_, input_frontier_, outbuf,
+            csr_, *gdata_, input_frontier_, outbuf,
             lcl_row_offsets, nparts_per_blk, partition_starts);
     } else {
       CUDAAdvanceLBKernel<32, Config, GData, Functor>
         <<<nblks, nthrs, 0, rtcfg_.stream>>>(
-            csr_, gdata_, input_frontier_, outbuf,
+            csr_, *gdata_, input_frontier_, outbuf,
             lcl_row_offsets, nparts_per_blk, partition_starts);
     }
 
