@@ -8,7 +8,7 @@ namespace advance {
 
 #define MAX_NTHREADS 1024
 #define PER_THREAD_WORKLOAD 1
-#define MAX_NBLOCKS 65535L
+#define MAX_NBLOCKS 65535
 
 // Binary search the row_offsets to find the source node of the edge id.
 __device__ __forceinline__ mg_int BinarySearchSrc(const IntArray1D& array, mg_int eid) {
@@ -77,7 +77,7 @@ void CudaAdvanceAllGunrockLBOut(
   const mg_int M = csr.column_indices.length;
   const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
-  const int by = std::min((M + ny - 1) / ny, MAX_NBLOCKS);
+  const int by = std::min((M + ny - 1) / ny, static_cast<mg_int>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
   //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("

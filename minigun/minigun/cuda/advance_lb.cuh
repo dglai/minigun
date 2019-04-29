@@ -65,7 +65,8 @@ __global__ void CUDAAdvanceLBKernel(
     // cooperatively load row offsets into load shared mem
     // each thread is in charge of one vertex
     // TODO(minjie): can use more threads
-    const mg_int part_start = max(_ldg(partition_starts.data + part_idx) - 1, 0L);
+    const mg_int part_start = max(_ldg(partition_starts.data + part_idx) - 1,
+        static_cast<mg_int>(0));
     const mg_int part_end = _ldg(partition_starts.data + part_idx + 1);
     const mg_int in_item = part_start + threadIdx.y;
     //printf("pidx=%ld, st=%ld ed=%ld\n", part_idx, part_start, part_end);

@@ -15,7 +15,7 @@ namespace minigun {
 namespace advance {
 
 #define MAX_NTHREADS 1024
-#define MAX_NBLOCKS 65535L
+#define MAX_NBLOCKS 65535
 
 struct StridedIterator :
   mgpu::const_iterator_t<StridedIterator, int, mg_int> {
@@ -131,7 +131,7 @@ class CudaAdvanceExecutor {
     const mg_int M = out_len_;
     const int ty = MAX_NTHREADS / rtcfg_.data_num_threads;
     const int ny = ty * 2;  // XXX: each block handles two partitions
-    const int by = std::min((M + ny - 1) / ny, MAX_NBLOCKS);
+    const int by = std::min((M + ny - 1) / ny, static_cast<mg_int>(MAX_NBLOCKS));
     const int nparts_per_blk = ((M + by - 1) / by + ty - 1) / ty;
     const dim3 nblks(rtcfg_.data_num_blocks, by);
     const dim3 nthrs(rtcfg_.data_num_threads, ty);
