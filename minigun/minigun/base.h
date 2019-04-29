@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <dmlc/logging.h>
 
-typedef int32_t mg_int;
+typedef int64_t mg_int;
 
 namespace minigun {
 
