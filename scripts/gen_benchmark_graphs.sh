@@ -14,6 +14,7 @@ echo "Citation graphs..."
 python3 scripts/gen_dgl_graph.py -o bench-graphs/cora.grh --dataset=cora
 python3 scripts/gen_dgl_graph.py -o bench-graphs/citeseer.grh --dataset=citeseer
 python3 scripts/gen_dgl_graph.py -o bench-graphs/pubmed.grh --dataset=pubmed
+python3 scripts/gen_dgl_graph.py -o bench-graphs/segtree.grh --dataset=segtree
 
 # generate E-R graphs
 echo "E-R graphs..."

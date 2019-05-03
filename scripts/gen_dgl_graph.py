@@ -2,14 +2,20 @@ import networkx as nx
 import argparse
 import dgl
 from dgl.data import register_data_args, load_data
+from segtree import build_segtree
 
 import graph_io
 
 def main(args):
-    data = load_data(args)
-    g = data.graph
-    print('#Nodes: %d #Edges: %d' % (g.number_of_nodes(), g.number_of_edges()))
-    csr = nx.to_scipy_sparse_matrix(g, weight=None, format='csr')
+    if args.dataset == 'segtree':
+        g = build_segtree(batch_size=32, seq_len=512)
+        print('#Nodes: %d #Edges: %d' % (g.number_of_nodes(), g.number_of_edges()))
+        csr = g.adjacency_matrix_scipy(fmt='csr')        
+    else:
+        data = load_data(args)
+        g = data.graph
+        csr = nx.to_scipy_sparse_matrix(g, weight=None, format='csr')
+
     graph_io.save_graph(args.out, csr)
 
 if __name__ == '__main__':
