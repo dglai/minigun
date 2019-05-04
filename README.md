@@ -1,17 +1,17 @@
 # MiniGun: Light-weight GPU kernel interface for graph operations
 
-The project is heavily influenced by the Gunrock project. The goal is to define a general kernel library
-that can cover a wide range of graph operations.
+The project is heavily influenced by the [Gunrock project](https://github.com/gunrock/gunrock).
+The goal is to define a general kernel library that can cover a wide range of graph operations used in [DGL](https://github.com/dmlc/dgl).
 
-Roadmap:
+Current roadmap:
 - [x] Port basic advance operator (all edge policy).
-- [ ] Port advance operator with dynamic frontiers.
+- [x] Port advance operator with dynamic frontiers.
 - [ ] Port more advance kernel policies
   - [ ] TWC
   - [ ] Inbound edge partition
-  - [ ] outbound edge partition
-- [ ] CPU implementation for advance
-- [ ] Integration with DGL
+  - [x] outbound edge partition
+- [x] CPU implementation for advance
+- [x] Integration with DGL
 - [ ] Filter
 
 ## Build
@@ -34,3 +34,6 @@ You could run sample by (in the `build` folder):
 ```bash
 ./samples/spmv/spmv
 ```
+
+-------------
+*Disclaimer:* Minigun project is not related to the ["mini-gunrock" project](https://github.com/gunrock/mini).
