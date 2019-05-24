@@ -40,44 +40,45 @@ __device__ int BinarySearch(KeyType i, ArrayType* queue) {
  *  - start position of each partition
  */
 template <int N_SMEM_ELEMENTS,
+          typename Idx,
           typename Config,
           typename GData,
           typename Functor>
 __global__ void CUDAAdvanceLBKernel(
-    Csr csr,
+    Csr<Idx> csr,
     GData gdata,
-    IntArray1D input_frontier,
-    IntArray1D output_frontier,
-    IntArray1D lcl_row_offsets,
+    IntArray1D<Idx> input_frontier,
+    IntArray1D<Idx> output_frontier,
+    IntArray1D<Idx> lcl_row_offsets,
     int nparts_per_blk,
-    IntArray1D partition_starts) {
+    IntArray1D<Idx> partition_starts) {
 
   // XXX: currently N_SMEM_ELEMENTS must be equal to blockDim.y
-  __shared__ mg_int s_lcl_row_offsets[N_SMEM_ELEMENTS];
-  __shared__ mg_int s_glb_row_offsets[N_SMEM_ELEMENTS];
-  __shared__ mg_int s_lcl2glb_vid[N_SMEM_ELEMENTS];
+  __shared__ Idx s_lcl_row_offsets[N_SMEM_ELEMENTS];
+  __shared__ Idx s_glb_row_offsets[N_SMEM_ELEMENTS];
+  __shared__ Idx s_lcl2glb_vid[N_SMEM_ELEMENTS];
 
-  mg_int blk_out_start = blockDim.y * nparts_per_blk * blockIdx.y;
-  mg_int part_idx = blockIdx.y * nparts_per_blk;
-  const mg_int loop_end = min(partition_starts.length - 1,
+  Idx blk_out_start = blockDim.y * nparts_per_blk * blockIdx.y;
+  Idx part_idx = blockIdx.y * nparts_per_blk;
+  const Idx loop_end = min(partition_starts.length - 1,
                               part_idx + nparts_per_blk);
   while (part_idx < loop_end) {
     // cooperatively load row offsets into load shared mem
     // each thread is in charge of one vertex
     // TODO(minjie): can use more threads
-    const mg_int part_start = max(_ldg(partition_starts.data + part_idx) - 1,
-        static_cast<mg_int>(0));
-    const mg_int part_end = _ldg(partition_starts.data + part_idx + 1);
-    const mg_int in_item = part_start + threadIdx.y;
+    const Idx part_start = max(_ldg(partition_starts.data + part_idx) - 1,
+        static_cast<Idx>(0));
+    const Idx part_end = _ldg(partition_starts.data + part_idx + 1);
+    const Idx in_item = part_start + threadIdx.y;
     //printf("pidx=%ld, st=%ld ed=%ld\n", part_idx, part_start, part_end);
     if (in_item < part_end) {
       s_lcl_row_offsets[threadIdx.y] = _ldg(lcl_row_offsets.data + in_item);
-      mg_int src = 0;
+      Idx src = 0;
       if (Config::kMode == kE2V || Config::kMode == kE2E) {
         if (Config::kAdvanceAll) {
           src = _ldg(csr.column_indices.data + in_item);
         } else {
-          const mg_int in_eid = _ldg(input_frontier.data + in_item);
+          const Idx in_eid = _ldg(input_frontier.data + in_item);
           src = _ldg(csr.column_indices.data + in_eid);
         }
       } else {
@@ -90,24 +91,24 @@ __global__ void CUDAAdvanceLBKernel(
       s_glb_row_offsets[threadIdx.y] = _ldg(csr.row_offsets.data + src);
       s_lcl2glb_vid[threadIdx.y] = src;
     } else {
-      s_lcl_row_offsets[threadIdx.y] = types::MaxValue<mg_int>();
-      s_glb_row_offsets[threadIdx.y] = kInvalid;
-      s_lcl2glb_vid[threadIdx.y] = kInvalid;
+      s_lcl_row_offsets[threadIdx.y] = types::MaxValue<Idx>();
+      s_glb_row_offsets[threadIdx.y] = MG_INVALID;
+      s_lcl2glb_vid[threadIdx.y] = MG_INVALID;
     }
     __syncthreads();
 
     // cooperatively process edges mapped by the row offsets
     // in the shared memory; each thread is in charge of one edge
-    const mg_int out_item = blk_out_start + threadIdx.y;
+    const Idx out_item = blk_out_start + threadIdx.y;
     //printf("(%d, %d): pidx=%ld %ld\n", blockIdx.y, threadIdx.y, part_idx, out_item);
     if (out_item < output_frontier.length) {
       // TODO(minjie): binary search is not always needed
-      const mg_int s_lclsrc = BinarySearch<N_SMEM_ELEMENTS>(out_item, s_lcl_row_offsets) - 1;
-      const mg_int src = s_lcl2glb_vid[s_lclsrc];
+      const Idx s_lclsrc = BinarySearch<N_SMEM_ELEMENTS>(out_item, s_lcl_row_offsets) - 1;
+      const Idx src = s_lcl2glb_vid[s_lclsrc];
       // find the index of the current edge w.r.t. its src node
-      const mg_int veid = out_item - s_lcl_row_offsets[s_lclsrc];
-      const mg_int eid = s_glb_row_offsets[s_lclsrc] + veid;
-      const mg_int dst = _ldg(csr.column_indices.data + eid);
+      const Idx veid = out_item - s_lcl_row_offsets[s_lclsrc];
+      const Idx eid = s_glb_row_offsets[s_lclsrc] + veid;
+      const Idx dst = _ldg(csr.column_indices.data + eid);
       //printf("%ld %ld %ld %ld %ld\n", out_item, s_lclsrc, src, eid, dst);
       if (Functor::CondEdge(src, dst, eid, &gdata)) {
         Functor::ApplyEdge(src, dst, eid, &gdata);
@@ -120,7 +121,7 @@ __global__ void CUDAAdvanceLBKernel(
       } else {
         if (Config::kMode != kV2N && Config::kMode != kE2N) {
           // Add invalid to output frontier
-          output_frontier.data[out_item] = kInvalid;
+          output_frontier.data[out_item] = MG_INVALID;
         }
       }
     }

@@ -4,12 +4,10 @@
 #include <cstdint>
 #include <dmlc/logging.h>
 
-typedef int32_t mg_int;
-
 namespace minigun {
 
 // const for invalid frontier value
-static const mg_int kInvalid = -1;
+#define MG_INVALID -1
 
 }  // namespace minigun
 

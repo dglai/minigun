@@ -52,7 +52,12 @@ struct Config {
   static const FrontierMode kMode = MODE;
 };
 
+/*!
+ * \brief Template specialization to dispatch to implementations
+ *        on different devices.
+ */
 template <int XPU,
+          typename Idx,
           typename Config,
           typename GData,
           typename Functor,
@@ -70,10 +75,11 @@ struct DispatchXPU {
 };
 
 
-/*
- * !\brief Advance kernel.
+/*!
+ * \brief Advance kernel.
  *
  * \tparam XPU The computing device type (DLDeviceType)
+ * \tparam Idx The type of the index (usually int32_t or int64_t)
  * \tparam Config The static configuration of advance kernel.
  * \tparam GData The user-defined graph data.
  * \tparam Functor The user-defined functions.
@@ -89,21 +95,22 @@ struct DispatchXPU {
  * \param alloc The external memory allocator.
  */
 template <int XPU,
+          typename Idx,
           typename Config,
           typename GData,
           typename Functor,
           typename Alloc = DefaultAllocator<XPU> >
 void Advance(const RuntimeConfig& config,
-             const Csr& csr,
+             const Csr<Idx>& csr,
              GData* gdata,
-             IntArray1D input_frontier,
-             IntArray1D* output_frontier = nullptr,
+             IntArray1D<Idx> input_frontier,
+             IntArray1D<Idx>* output_frontier = nullptr,
              Alloc* alloc = DefaultAllocator<XPU>::Get()) {
   if (Config::kMode != kV2N && Config::kMode != kE2N
       && output_frontier == nullptr) {
     LOG(FATAL) << "Require computing output frontier but no buffer is provided.";
   }
-  DispatchXPU<XPU, Config, GData, Functor, Alloc>::Advance(
+  DispatchXPU<XPU, Idx, Config, GData, Functor, Alloc>::Advance(
       config, csr, gdata,
       input_frontier, output_frontier, alloc);
 }
