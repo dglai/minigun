@@ -6,19 +6,19 @@
 namespace minigun {
 namespace advance {
 
-template <typename Config>
+template <typename Idx, typename Config>
 AdvanceAlg FindAdvanceAllAlgo(
     const RuntimeConfig& rtcfg,
-    const Csr& csr) {
+    const Csr<Idx>& csr) {
   // TODO(minjie): more
   return kGunrockLBOut;
 }
 
-template <typename Config>
+template <typename Idx, typename Config>
 AdvanceAlg FindAdvanceAlgo(
     const RuntimeConfig& rtcfg,
-    const Csr& csr,
-    const IntArray1D& input_frontier) {
+    const Csr<Idx>& csr,
+    const IntArray1D<Idx>& input_frontier) {
   // TODO(minjie): more
   return kGunrockLBOut;
 }

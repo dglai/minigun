@@ -8,7 +8,7 @@
 #include "../samples_utils.h"
 
 struct GData {
-  mg_int dim = 0;
+  int32_t dim = 0;
   float* cur{nullptr};
   float* next{nullptr};
   float* weight{nullptr};
@@ -16,12 +16,12 @@ struct GData {
 
 struct SPMMFunctor {
   static inline bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static inline void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    for (mg_int fid = 0; fid < gdata->dim; ++fid) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    for (int32_t fid = 0; fid < gdata->dim; ++fid) {
 #pragma omp atomic
       gdata->next[dst * gdata->dim + fid] += gdata->cur[src * gdata->dim + fid] *
         gdata->weight[eid];
@@ -29,18 +29,18 @@ struct SPMMFunctor {
   }
 };
 
-const mg_int D = 128;  // number of features
+const int32_t D = 128;  // number of features
 
 std::vector<float> GroundTruth(
-    const std::vector<mg_int>& row_offsets,
-    const std::vector<mg_int>& column_indices,
+    const std::vector<int32_t>& row_offsets,
+    const std::vector<int32_t>& column_indices,
     const std::vector<float>& vdata,
     const std::vector<float>& edata) {
   std::vector<float> ret(vdata.size(), 0);
   for (size_t u = 0; u < row_offsets.size() - 1; ++u) {
-    for (mg_int eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
-      mg_int v = column_indices[eid];
-      for (mg_int idx = 0; idx < D; ++idx) {
+    for (int32_t eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
+      int32_t v = column_indices[eid];
+      for (int32_t idx = 0; idx < D; ++idx) {
         ret[v * D + idx] += vdata[u * D + idx] * edata[eid];
       }
     }
@@ -52,16 +52,16 @@ int main(int argc, char** argv) {
   srand(42);
 
   // create graph
-  std::vector<mg_int> row_offsets, column_indices;
+  std::vector<int32_t> row_offsets, column_indices;
   utils::CreateNPGraph(1000, 0.01, row_offsets, column_indices);
-  const mg_int N = row_offsets.size() - 1;
-  const mg_int M = column_indices.size();
+  const int32_t N = row_offsets.size() - 1;
+  const int32_t M = column_indices.size();
   std::cout << "#nodes: " << N << " #edges: " << M
     << " #feats: " << D << std::endl;
 
   // copy graph to gpu
-  minigun::Csr csr;
-  minigun::IntArray1D infront;
+  minigun::IntCsr csr;
+  minigun::IntArray infront;
   csr.row_offsets.length = row_offsets.size();
   csr.row_offsets.data = &row_offsets[0];
   csr.column_indices.length = column_indices.size();
@@ -73,10 +73,10 @@ int main(int argc, char** argv) {
 
   // Create feature data
   std::vector<float> vvec(N * D), evec(M);
-  for (mg_int i = 0; i < N * D; ++i) {
+  for (int32_t i = 0; i < N * D; ++i) {
     vvec[i] = (float)rand() / RAND_MAX;
   }
-  for (mg_int i = 0; i < M; ++i) {
+  for (int32_t i = 0; i < M; ++i) {
     evec[i] = (float)rand() / RAND_MAX;
   }
 
@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
       vvec, evec);
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLCPU, Config, GData, SPMMFunctor>(
+  minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMMFunctor>(
       config, csr, &gdata, infront, nullptr,
       utils::CPUAllocator::Get());
 
@@ -102,14 +102,14 @@ int main(int argc, char** argv) {
 
   const int K = 10;
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, Config, GData, SPMMFunctor>(
+    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMMFunctor>(
         config, csr, &gdata, infront, nullptr,
         utils::CPUAllocator::Get());
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, Config, GData, SPMMFunctor>(
+    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMMFunctor>(
         config, csr, &gdata, infront, nullptr,
         utils::CPUAllocator::Get());
   }

@@ -14,8 +14,8 @@ using minigun::advance::RuntimeConfig;
 using namespace esoftmax;
 
 double RunMinigun(const utils::SampleCsr& scsr,
-                  const minigun::Csr& csr,
-                  mg_int feat_size, mg_int num_heads) {
+                  const minigun::IntCsr& csr,
+                  int32_t feat_size, int32_t num_heads) {
   // gdata
   GData gdata, truth;
   gdata.H = num_heads;
@@ -30,15 +30,15 @@ double RunMinigun(const utils::SampleCsr& scsr,
   rtcfg.data_num_blocks = gdata.H / nt;
   CUDA_CALL(cudaStreamCreate(&rtcfg.stream));
 
-  minigun::IntArray1D infront;
+  minigun::IntArray infront;
 
   // dry run
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLGPU, Config, GData, EdgeMax>(
+  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
       rtcfg, csr, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, Config, GData, MinusMaxExpSum>(
+  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinusMaxExpSum>(
       rtcfg, csr, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, Config, GData, Norm>(
+  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, Norm>(
       rtcfg, csr, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
@@ -47,11 +47,11 @@ double RunMinigun(const utils::SampleCsr& scsr,
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, Config, GData, EdgeMax>(
+    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
         rtcfg, csr, &gdata, infront);
-    minigun::advance::Advance<kDLGPU, Config, GData, MinusMaxExpSum>(
+    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinusMaxExpSum>(
         rtcfg, csr, &gdata, infront);
-    minigun::advance::Advance<kDLGPU, Config, GData, Norm>(
+    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, Norm>(
         rtcfg, csr, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
@@ -65,18 +65,18 @@ double RunMinigun(const utils::SampleCsr& scsr,
 }
 
 double RunBaseline1(const utils::SampleCsr& scsr,
-                  const minigun::Csr& csr,
-                  mg_int feat_size, mg_int num_heads) {
+                  const minigun::IntCsr& csr,
+                  int32_t feat_size, int32_t num_heads) {
   // gdata
   GData gdata, truth;
   gdata.H = num_heads;
   InitGData(scsr, &gdata, &truth);
  
-  const mg_int N = csr.row_offsets.length - 1;
+  const int32_t N = csr.row_offsets.length - 1;
   const int H = gdata.H;
 
   // dry run
-  custom_kernel::sparse_softmax_forward_kernel<mg_int, float><<<(N + 31) / 32, dim3(32, H)>>>(
+  custom_kernel::sparse_softmax_forward_kernel<int32_t, float><<<(N + 31) / 32, dim3(32, H)>>>(
       csr.row_offsets.data,
       gdata.score,
       gdata.ret,
@@ -87,7 +87,7 @@ double RunBaseline1(const utils::SampleCsr& scsr,
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    custom_kernel::sparse_softmax_forward_kernel<mg_int, float><<<(N + 31) / 32, dim3(32, H)>>>(
+    custom_kernel::sparse_softmax_forward_kernel<int32_t, float><<<(N + 31) / 32, dim3(32, H)>>>(
         csr.row_offsets.data,
         gdata.score,
         gdata.ret,
@@ -115,12 +115,12 @@ int main(int argc, char** argv) {
 
   utils::SampleCsr scsr;
   utils::LoadGraphFromFile(filename, &scsr);
-  const mg_int N = scsr.row_offsets.size() - 1;
-  const mg_int M = scsr.column_indices.size();
+  const int32_t N = scsr.row_offsets.size() - 1;
+  const int32_t M = scsr.column_indices.size();
   std::cout << "#Nodes: " << N << " #Edges: " << M << std::endl;
 
   // csr
-  minigun::Csr csr = utils::ToMinigunCsr(scsr, kDLGPU);
+  minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
 
   double dur1 = RunMinigun(scsr, csr, 0, num_heads);
   std::cout << "minigun time(ms): " << dur1 << std::endl;

@@ -18,12 +18,12 @@ struct GData {
 // backward softmax phase 0
 struct BackSoftmaxAccum {
   static __device__ __forceinline__ bool CondEdge(
-    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   // accum: (N, H)
   static __device__ __forceinline__ void ApplyEdge(
-    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     const int H = gdata->H;
     // each thread handles one attention head
     int h = blockIdx.x * blockDim.x + threadIdx.x;
@@ -43,12 +43,12 @@ struct BackSoftmaxAccum {
 
 struct BackSoftmaxMinus {
   static __device__ __forceinline__ bool CondEdge(
-    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   // accum: (N, H)
   static __device__ __forceinline__ void ApplyEdge(
-    mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     const int H = gdata->H;
     // each thread handles one attention head
     int h = blockIdx.x * blockDim.x + threadIdx.x;
@@ -65,8 +65,8 @@ struct BackSoftmaxMinus {
 
 
 void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
-  const mg_int N = csr.row_offsets.size() - 1;
-  const mg_int M = csr.column_indices.size();
+  const int32_t N = csr.row_offsets.size() - 1;
+  const int32_t M = csr.column_indices.size();
   const int H = gdata->H;
   std::vector<float> accum(N * gdata->H, 0.);
   std::vector<float> score(M * gdata->H, 0.), grad_score(M * gdata->H, 0.), out(M * gdata->H, 0.);
@@ -89,17 +89,17 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   // compute truth
   truth->out = new float[M * H];
   for (size_t u = 0; u < csr.row_offsets.size() - 1; u++) {
-    for (mg_int i = csr.row_offsets[u]; i < csr.row_offsets[u + 1]; i++) {
-      mg_int v = csr.column_indices[i];
-      for (mg_int h = 0; h < H; h++) {
+    for (int32_t i = csr.row_offsets[u]; i < csr.row_offsets[u + 1]; i++) {
+      int32_t v = csr.column_indices[i];
+      for (int32_t h = 0; h < H; h++) {
         accum[v * H + h] -= grad_score[i * H + h] * score[i * H + h];
       }
     }
   }
   for (size_t u = 0; u < csr.row_offsets.size() - 1; u++) {
-    for (mg_int i = csr.row_offsets[u]; i < csr.row_offsets[u + 1]; i++) {
-      mg_int v = csr.column_indices[i];
-      for (mg_int h = 0; h < H; h++) {
+    for (int32_t i = csr.row_offsets[u]; i < csr.row_offsets[u + 1]; i++) {
+      int32_t v = csr.column_indices[i];
+      for (int32_t h = 0; h < H; h++) {
         truth->out[i * H + h] = accum[v * H + h] * score[i * H + h] + grad_score[i * H + h] * score[i * H + h];
       }
     }
@@ -115,7 +115,7 @@ void FreeGData(GData* gdata, GData* truth) {
 }
 
 void CheckResult(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
-  const mg_int M = csr.column_indices.size();
+  const int32_t M = csr.column_indices.size();
   const int H = gdata->H;
   float* h_ret = new float[M * H];
   CUDA_CALL(cudaMemcpy(h_ret, gdata->out, sizeof(float) * M * H, cudaMemcpyDeviceToHost));

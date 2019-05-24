@@ -47,13 +47,13 @@ bool IterEqual(Iter1 v1, Iter2 v2, size_t count) {
   return true;
 }
 
-__inline__ void CreateNPGraph(int64_t N, float P,
-    std::vector<mg_int>& row_offsets,
-    std::vector<mg_int>& column_indices) {
+inline void CreateNPGraph(int64_t N, float P,
+    std::vector<int32_t>& row_offsets,
+    std::vector<int32_t>& column_indices) {
   row_offsets.resize(N+1, 0);
   row_offsets[0] = 0;
-  for (mg_int u = 0; u < N; ++u) {
-    for (mg_int v = 0; v < N; ++v) {
+  for (int32_t u = 0; u < N; ++u) {
+    for (int32_t v = 0; v < N; ++v) {
       if ((float)rand() / RAND_MAX < P) {
         column_indices.push_back(v);
       }

@@ -17,16 +17,16 @@ struct GData {
 
 struct SPMMFunctor {
   static __device__ __forceinline__ bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     const int D = gdata->D;
     const int H = gdata->H;
     // each thread handles one attention head
-    mg_int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    mg_int stride_x = blockDim.x * gridDim.x;
+    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t stride_x = blockDim.x * gridDim.x;
     float* srcoff = gdata->ndata + (src * H * D);
     float* eidoff = gdata->weight + (eid * H);
     float* outoff = gdata->out + (dst * H * D);
@@ -39,8 +39,8 @@ struct SPMMFunctor {
 };
 
 void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
-  const mg_int N = csr.row_offsets.size() - 1;
-  const mg_int M = csr.column_indices.size();
+  const int32_t N = csr.row_offsets.size() - 1;
+  const int32_t M = csr.column_indices.size();
   const int H = gdata->H, D = gdata->D;
   std::vector<float> ndata(N * gdata->D * gdata->H), weight(M * gdata->H, 0.), out(N * gdata->D * gdata->H, 0.);
   for (size_t i = 0; i < ndata.size(); ++i) {
@@ -62,10 +62,10 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   truth->out = new float[N * H * D];
   std::fill(truth->out, truth->out + N * H * D, 0.);
   for (size_t u = 0; u < csr.row_offsets.size() - 1; u++) {
-    for (mg_int eid = csr.row_offsets[u]; eid < csr.row_offsets[u + 1]; eid++) {
-      mg_int v = csr.column_indices[eid];
-      for (mg_int h = 0; h < H; h++) {
-        for (mg_int idx = 0; idx < D; idx++)
+    for (int32_t eid = csr.row_offsets[u]; eid < csr.row_offsets[u + 1]; eid++) {
+      int32_t v = csr.column_indices[eid];
+      for (int32_t h = 0; h < H; h++) {
+        for (int32_t idx = 0; idx < D; idx++)
           truth->out[((v * H) + h) * D + idx] +=
             ndata[((u * H) + h) * D + idx] * weight[eid * H + h];
       }
@@ -81,8 +81,8 @@ void FreeGData(GData* gdata, GData* truth) {
 }
 
 void CheckResult(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
-  const mg_int N = csr.row_offsets.size() - 1;
-  const mg_int M = csr.column_indices.size();
+  const int32_t N = csr.row_offsets.size() - 1;
+  const int32_t M = csr.column_indices.size();
   const int H = gdata->H, D = gdata->D;
   float* h_out = new float[N * H * D];
   CUDA_CALL(cudaMemcpy(h_out, gdata->out, sizeof(float) * N * H * D, cudaMemcpyDeviceToHost));

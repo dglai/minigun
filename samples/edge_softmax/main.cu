@@ -9,7 +9,7 @@
 #include "../samples_utils.h"
 
 struct GData {
-  mg_int dim = 0;
+  int32_t dim = 0;
   float* sum{nullptr};  // ndata
   float* max{nullptr};  // ndata
   float* score{nullptr};
@@ -30,14 +30,14 @@ __device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
 // Max
 struct EdgeMax {
   static __device__ __forceinline__ bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    mg_int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    mg_int stride_x = blockDim.x * gridDim.x;
-    const mg_int dim = gdata->dim;
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t stride_x = blockDim.x * gridDim.x;
+    const int32_t dim = gdata->dim;
     while (tx < dim) {
       MyAtomicMax(gdata->max + dst * dim + tx, gdata->score[eid * dim + tx]);
       tx += stride_x;
@@ -48,14 +48,14 @@ struct EdgeMax {
 // minus max, exp and sum
 struct MinuxMaxExpSum {
   static __device__ __forceinline__ bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    mg_int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    mg_int stride_x = blockDim.x * gridDim.x;
-    const mg_int dim = gdata->dim;
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t stride_x = blockDim.x * gridDim.x;
+    const int32_t dim = gdata->dim;
     while (tx < dim) {
       gdata->score[eid * dim + tx] = expf(
           gdata->score[eid * dim + tx] - gdata->max[dst * dim + tx]);
@@ -68,14 +68,14 @@ struct MinuxMaxExpSum {
 // norm
 struct Norm {
   static __device__ __forceinline__ bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
-    mg_int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    mg_int stride_x = blockDim.x * gridDim.x;
-    const mg_int dim = gdata->dim;
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t stride_x = blockDim.x * gridDim.x;
+    const int32_t dim = gdata->dim;
     while (tx < dim) {
       gdata->score[eid * dim + tx] /= gdata->sum[dst * dim + tx];
       tx += stride_x;
@@ -83,11 +83,11 @@ struct Norm {
   }
 };
 
-const mg_int D = 8;  // number of heads
+const int32_t D = 8;  // number of heads
 
 std::vector<float> GroundTruth(
-    const std::vector<mg_int>& row_offsets,
-    const std::vector<mg_int>& column_indices,
+    const std::vector<int32_t>& row_offsets,
+    const std::vector<int32_t>& column_indices,
     std::vector<float> score) {
   const size_t N = row_offsets.size() - 1;
   std::vector<float> tmp(N * D, 0.);
@@ -95,15 +95,15 @@ std::vector<float> GroundTruth(
     score[i] = std::exp(score[i]);
   }
   for (size_t u = 0; u < row_offsets.size() - 1; ++u) {
-    for (mg_int eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
-      mg_int v = column_indices[eid];
-      for (mg_int idx = 0; idx < D; ++idx) {
+    for (int32_t eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
+      int32_t v = column_indices[eid];
+      for (int32_t idx = 0; idx < D; ++idx) {
         tmp[v * D + idx] += score[eid * D + idx];
       }
     }
   }
   for (size_t eid = 0; eid < column_indices.size(); ++eid) {
-    for (mg_int i = 0; i < D; ++i) {
+    for (int32_t i = 0; i < D; ++i) {
       score[eid * D + i] /= tmp[column_indices[eid] * D + i];
     }
   }
@@ -114,25 +114,25 @@ int main(int argc, char** argv) {
   srand(42);
 
   // create graph
-  std::vector<mg_int> row_offsets, column_indices;
+  std::vector<int32_t> row_offsets, column_indices;
   utils::CreateNPGraph(1000, 0.01, row_offsets, column_indices);
-  const mg_int N = row_offsets.size() - 1;
-  const mg_int M = column_indices.size();
+  const int32_t N = row_offsets.size() - 1;
+  const int32_t M = column_indices.size();
   std::cout << "#nodes: " << N << " #edges: " << M
     << " #feats: " << D << std::endl;
 
   // copy graph to gpu
   CUDA_CALL(cudaSetDevice(0));
-  minigun::Csr csr;
-  minigun::IntArray1D infront;
+  minigun::IntCsr csr;
+  minigun::IntArray infront;
   csr.row_offsets.length = row_offsets.size();
-  CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(mg_int) * row_offsets.size()));
+  CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(int32_t) * row_offsets.size()));
   CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &row_offsets[0],
-        sizeof(mg_int) * row_offsets.size(), cudaMemcpyHostToDevice));
+        sizeof(int32_t) * row_offsets.size(), cudaMemcpyHostToDevice));
   csr.column_indices.length = column_indices.size();
-  CUDA_CALL(cudaMalloc(&csr.column_indices.data, sizeof(mg_int) * column_indices.size()));
+  CUDA_CALL(cudaMalloc(&csr.column_indices.data, sizeof(int32_t) * column_indices.size()));
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
-        sizeof(mg_int) * column_indices.size(), cudaMemcpyHostToDevice));
+        sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
   // Create stream
   minigun::advance::RuntimeConfig config;
@@ -144,10 +144,10 @@ int main(int argc, char** argv) {
 
   // Create feature data
   std::vector<float> vvec(N * D), evec(M * D);
-  for (mg_int i = 0; i < N * D; ++i) {
+  for (int32_t i = 0; i < N * D; ++i) {
     vvec[i] = std::numeric_limits<float>::lowest();
   }
-  for (mg_int i = 0; i < M * D; ++i) {
+  for (int32_t i = 0; i < M * D; ++i) {
     evec[i] = (float)rand() / RAND_MAX - 0.5;
   }
   //utils::VecPrint(evec);
@@ -169,11 +169,11 @@ int main(int argc, char** argv) {
   //utils::VecPrint(truth);
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLGPU, Config, GData, EdgeMax>(
+  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
       config, csr, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, Config, GData, MinuxMaxExpSum>(
+  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinuxMaxExpSum>(
       config, csr, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, Config, GData, Norm>(
+  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, Norm>(
       config, csr, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());

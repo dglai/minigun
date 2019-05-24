@@ -11,10 +11,11 @@ namespace advance {
 #define MAX_NBLOCKS 65535
 
 // Binary search the row_offsets to find the source node of the edge id.
-__device__ __forceinline__ mg_int BinarySearchSrc(const IntArray1D& array, mg_int eid) {
-  mg_int lo = 0, hi = array.length - 1;
+template <typename Idx>
+__device__ __forceinline__ Idx BinarySearchSrc(const IntArray1D<Idx>& array, Idx eid) {
+  Idx lo = 0, hi = array.length - 1;
   while (lo < hi) {
-    mg_int mid = (lo + hi) >> 1;
+    Idx mid = (lo + hi) >> 1;
     if (_ldg(array.data + mid) <= eid) {
       lo = mid + 1;
     } else {
@@ -29,21 +30,22 @@ __device__ __forceinline__ mg_int BinarySearchSrc(const IntArray1D& array, mg_in
   }
 }
 
-template <typename Config,
+template <typename Idx,
+          typename Config,
           typename GData,
           typename Functor>
 __global__ void CudaAdvanceAllGunrockLBOutKernel(
-    Csr csr,
+    Csr<Idx> csr,
     GData gdata,
-    IntArray1D output_frontier) {
-  mg_int ty = blockIdx.y * blockDim.y + threadIdx.y;
-  mg_int stride_y = blockDim.y * gridDim.y;
-  mg_int eid = ty;
+    IntArray1D<Idx> output_frontier) {
+  Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
+  Idx stride_y = blockDim.y * gridDim.y;
+  Idx eid = ty;
   while (eid < csr.column_indices.length) {
     // TODO(minjie): this is pretty inefficient; binary search is needed only
     //   when the thread is processing the neighbor list of a new node.
-    mg_int src = BinarySearchSrc(csr.row_offsets, eid);
-    mg_int dst = _ldg(csr.column_indices.data + eid);
+    Idx src = BinarySearchSrc(csr.row_offsets, eid);
+    Idx dst = _ldg(csr.column_indices.data + eid);
     if (Functor::CondEdge(src, dst, eid, &gdata)) {
       Functor::ApplyEdge(src, dst, eid, &gdata);
       // Add dst/eid to output frontier
@@ -55,66 +57,68 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     } else {
       if (Config::kMode != kV2N && Config::kMode != kE2N) {
         // Add invalid to output frontier
-        output_frontier.data[eid] = kInvalid;
+        output_frontier.data[eid] = MG_INVALID;
       }
     }
     eid += stride_y;
   }
 };
 
-template <typename Config,
+template <typename Idx,
+          typename Config,
           typename GData,
           typename Functor,
           typename Alloc>
 void CudaAdvanceAllGunrockLBOut(
     const RuntimeConfig& rtcfg,
-    const Csr& csr,
+    const Csr<Idx>& csr,
     GData* gdata,
-    IntArray1D output_frontier,
+    IntArray1D<Idx> output_frontier,
     Alloc* alloc) {
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
-  const mg_int M = csr.column_indices.length;
+  const Idx M = csr.column_indices.length;
   const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
-  const int by = std::min((M + ny - 1) / ny, static_cast<mg_int>(MAX_NBLOCKS));
+  const int by = std::min((M + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
   //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
     //<< nthrs.x << "," << nthrs.y << ")";
-  CudaAdvanceAllGunrockLBOutKernel<Config, GData, Functor>
+  CudaAdvanceAllGunrockLBOutKernel<Idx, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata, output_frontier);
 }
 
-template <typename Config,
+template <typename Idx,
+          typename Config,
           typename GData,
           typename Functor,
           typename Alloc>
 void CudaAdvanceAll(
     AdvanceAlg algo,
     const RuntimeConfig& rtcfg,
-    const Csr& csr,
+    const Csr<Idx>& csr,
     GData* gdata,
-    IntArray1D* output_frontier,
+    IntArray1D<Idx>* output_frontier,
     Alloc* alloc) {
-  mg_int out_len = csr.column_indices.length;
+  Idx out_len = csr.column_indices.length;
   if (output_frontier) {
     if (output_frontier->data == nullptr) {
       // Allocate output frointer buffer, the length is equal to the number
       // of edges.
       output_frontier->length = out_len;
-      output_frontier->data = alloc->template AllocateData<mg_int>(
-          output_frontier->length * sizeof(mg_int));
+      output_frontier->data = alloc->template AllocateData<Idx>(
+          output_frontier->length * sizeof(Idx));
     } else {
       CHECK_GE(output_frontier->length, out_len)
         << "Require output frontier of length " << out_len
         << " but only got a buffer of length " << output_frontier->length;
     }
   }
-  IntArray1D outbuf = (output_frontier)? *output_frontier : IntArray1D();
+  IntArray1D<Idx> outbuf = (output_frontier)? *output_frontier : IntArray1D<Idx>();
   switch (algo) {
     case kGunrockLBOut :
-      CudaAdvanceAllGunrockLBOut<Config, GData, Functor, Alloc>(
+      CudaAdvanceAllGunrockLBOut<Idx, Config, GData, Functor, Alloc>(
           rtcfg, csr, gdata, outbuf, alloc);
       break;
     default:

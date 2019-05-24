@@ -15,26 +15,26 @@ struct GData {
 
 struct SPMVFunctor {
   static inline bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static inline void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
 #pragma omp atomic
     gdata->next[dst] += gdata->cur[src] * gdata->weight[eid];
   }
 };
 
 std::vector<float> GroundTruth(
-    const std::vector<mg_int>& row_offsets,
-    const std::vector<mg_int>& column_indices,
+    const std::vector<int32_t>& row_offsets,
+    const std::vector<int32_t>& column_indices,
     const std::vector<float>& vdata,
     const std::vector<float>& edata,
-    const std::vector<mg_int>& infront_vec) {
+    const std::vector<int32_t>& infront_vec) {
   std::vector<float> ret(vdata.size(), 0);
-  for (const mg_int u : infront_vec) {
-    for (mg_int eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
-      mg_int v = column_indices[eid];
+  for (const int32_t u : infront_vec) {
+    for (int32_t eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
+      int32_t v = column_indices[eid];
       ret[v] += vdata[u] * edata[eid];
     }
   }
@@ -43,22 +43,22 @@ std::vector<float> GroundTruth(
 
 int main(int argc, char** argv) {
   srand(42);
-  std::vector<mg_int> row_offsets, column_indices;
+  std::vector<int32_t> row_offsets, column_indices;
   utils::CreateNPGraph(10000, 0.01, row_offsets, column_indices);
-  const mg_int N = row_offsets.size() - 1;
-  const mg_int M = column_indices.size();
+  const int32_t N = row_offsets.size() - 1;
+  const int32_t M = column_indices.size();
   std::cout << "#nodes: " << N << " #edges: " << M << std::endl;
 
-  minigun::Csr csr;
+  minigun::IntCsr csr;
   csr.row_offsets.length = row_offsets.size();
   csr.row_offsets.data = &row_offsets[0];
   csr.column_indices.length = column_indices.size();
   csr.column_indices.data = &column_indices[0];
 
   // prepare frontiers
-  minigun::IntArray1D infront, outfront;
-  std::vector<mg_int> infront_vec;
-  for (mg_int i = 3; i < 3 + 500; ++i) {
+  minigun::IntArray infront, outfront;
+  std::vector<int32_t> infront_vec;
+  for (int32_t i = 3; i < 3 + 500; ++i) {
     infront_vec.push_back(i);
   }
   LOG(INFO) << "Input frontier size: " << infront_vec.size();
@@ -71,10 +71,10 @@ int main(int argc, char** argv) {
 
   // Create vdata, edata and copy to GPU
   std::vector<float> vvec(N), evec(M);
-  for (mg_int i = 0; i < N; ++i) {
+  for (int32_t i = 0; i < N; ++i) {
     vvec[i] = (float)rand() / RAND_MAX;
   }
-  for (mg_int i = 0; i < M; ++i) {
+  for (int32_t i = 0; i < M; ++i) {
     evec[i] = (float)rand() / RAND_MAX;
   }
 
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
   //utils::VecPrint(truth);
 
   typedef minigun::advance::Config<false, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
+  minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
       config, csr, &gdata, infront, &outfront,
       utils::CPUAllocator::Get());
 
@@ -100,14 +100,14 @@ int main(int argc, char** argv) {
   // warm up
   const int K = 10;
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
+    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
         config, csr, &gdata, infront, &outfront,
         utils::CPUAllocator::Get());
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, Config, GData, SPMVFunctor>(
+    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
         config, csr, &gdata, infront, &outfront,
         utils::CPUAllocator::Get());
   }
