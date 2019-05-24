@@ -19,7 +19,7 @@ namespace advance {
 
 template <typename Idx>
 struct StridedIterator :
-  mgpu::const_iterator_t<StridedIterator, int, Idx> {
+  mgpu::const_iterator_t<StridedIterator<Idx>, int, Idx> {
 
   StridedIterator() = default;
   MGPU_HOST_DEVICE StridedIterator(Idx offset, Idx stride, Idx bound) :

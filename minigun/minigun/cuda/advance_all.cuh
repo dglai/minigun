@@ -115,7 +115,7 @@ void CudaAdvanceAll(
         << " but only got a buffer of length " << output_frontier->length;
     }
   }
-  IntArray1D outbuf = (output_frontier)? *output_frontier : IntArray1D();
+  IntArray1D<Idx> outbuf = (output_frontier)? *output_frontier : IntArray1D<Idx>();
   switch (algo) {
     case kGunrockLBOut :
       CudaAdvanceAllGunrockLBOut<Idx, Config, GData, Functor, Alloc>(

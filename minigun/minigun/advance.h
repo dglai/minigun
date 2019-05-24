@@ -65,10 +65,10 @@ template <int XPU,
 struct DispatchXPU {
   static void Advance(
       const RuntimeConfig& config,
-      const Csr& csr,
+      const Csr<Idx>& csr,
       GData* gdata,
-      IntArray1D input_frontier,
-      IntArray1D* output_frontier,
+      IntArray1D<Idx> input_frontier,
+      IntArray1D<Idx>* output_frontier,
       Alloc* alloc) {
     LOG(FATAL) << "Not implemented for XPU: " << XPU;
   }

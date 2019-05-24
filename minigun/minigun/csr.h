@@ -11,7 +11,7 @@ namespace minigun {
 template <typename Idx>
 struct IntArray1D {
   Idx* data = nullptr;
-  int64_t length = 0;
+  Idx length = 0;
 };
 
 using IntArray = IntArray1D<int32_t>;

@@ -60,8 +60,7 @@ __global__ void CUDAAdvanceLBKernel(
 
   Idx blk_out_start = blockDim.y * nparts_per_blk * blockIdx.y;
   Idx part_idx = blockIdx.y * nparts_per_blk;
-  const Idx loop_end = min(partition_starts.length - 1,
-                              part_idx + nparts_per_blk);
+  const Idx loop_end = min(partition_starts.length - 1, part_idx + nparts_per_blk);
   while (part_idx < loop_end) {
     // cooperatively load row offsets into load shared mem
     // each thread is in charge of one vertex
