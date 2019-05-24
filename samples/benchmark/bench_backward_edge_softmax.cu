@@ -14,8 +14,8 @@ using minigun::advance::RuntimeConfig;
 using namespace esoftmax_back;
 
 double RunMinigun(const utils::SampleCsr& scsr,
-                  const minigun::Csr& csr,
-                  mg_int feat_size, mg_int num_heads) {
+                  const minigun::IntCsr& csr,
+                  int32_t feat_size, int32_t num_heads) {
   // gdata
   GData gdata, truth;
   gdata.H = num_heads;
@@ -30,13 +30,13 @@ double RunMinigun(const utils::SampleCsr& scsr,
   rtcfg.data_num_blocks = (gdata.H + nt - 1) / nt;
   CUDA_CALL(cudaStreamCreate(&rtcfg.stream));
 
-  minigun::IntArray1D infront;
+  minigun::IntArray infront;
 
   // dry run
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLGPU, Config, GData, BackSoftmaxAccum>(
+  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxAccum>(
       rtcfg, csr, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, Config, GData, BackSoftmaxMinus>(
+  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxMinus>(
       rtcfg, csr, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
@@ -45,9 +45,9 @@ double RunMinigun(const utils::SampleCsr& scsr,
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, Config, GData, BackSoftmaxAccum>(
+    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxAccum>(
         rtcfg, csr, &gdata, infront);
-    minigun::advance::Advance<kDLGPU, Config, GData, BackSoftmaxMinus>(
+    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxMinus>(
         rtcfg, csr, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
@@ -60,14 +60,14 @@ double RunMinigun(const utils::SampleCsr& scsr,
   return dur;
 }
 
-std::pair<utils::SampleCsr, std::vector<mg_int>> Transpose(const utils::SampleCsr& csr) {
-  const mg_int N = csr.row_offsets.size() - 1;
-  const mg_int M = csr.column_indices.size();
-  std::vector<std::vector<mg_int>> adjlist(N);
-  std::vector<std::vector<mg_int>> adjlist_e(N);
-  for (mg_int u = 0; u < csr.row_offsets.size() - 1; ++u) {
-    for (mg_int e = csr.row_offsets[u]; e < csr.row_offsets[u+1]; ++e) {
-      mg_int v = csr.column_indices[e];
+std::pair<utils::SampleCsr, std::vector<int32_t>> Transpose(const utils::SampleCsr& csr) {
+  const int32_t N = csr.row_offsets.size() - 1;
+  const int32_t M = csr.column_indices.size();
+  std::vector<std::vector<int32_t>> adjlist(N);
+  std::vector<std::vector<int32_t>> adjlist_e(N);
+  for (int32_t u = 0; u < csr.row_offsets.size() - 1; ++u) {
+    for (int32_t e = csr.row_offsets[u]; e < csr.row_offsets[u+1]; ++e) {
+      int32_t v = csr.column_indices[e];
       adjlist[v].push_back(u);
       adjlist_e[v].push_back(e);
     }
@@ -76,8 +76,8 @@ std::pair<utils::SampleCsr, std::vector<mg_int>> Transpose(const utils::SampleCs
   ret.row_offsets.resize(N+1);
   ret.column_indices.resize(M);
   ret.row_offsets[0] = 0;
-  std::vector<mg_int> eid(M);
-  for (mg_int u = 0; u < N; ++u) {
+  std::vector<int32_t> eid(M);
+  for (int32_t u = 0; u < N; ++u) {
     ret.row_offsets[u+1] = ret.row_offsets[u] + adjlist[u].size();
     std::copy(adjlist[u].begin(), adjlist[u].end(),
               ret.column_indices.begin() + ret.row_offsets[u]);
@@ -88,10 +88,10 @@ std::pair<utils::SampleCsr, std::vector<mg_int>> Transpose(const utils::SampleCs
 }
 
 double RunBaseline1(const utils::SampleCsr& scsr,
-                    const minigun::Csr& csr,
-                    mg_int feat_size, mg_int num_heads) {
-  const mg_int N = csr.row_offsets.length - 1;
-  const mg_int M = csr.column_indices.length;
+                    const minigun::IntCsr& csr,
+                    int32_t feat_size, int32_t num_heads) {
+  const int32_t N = csr.row_offsets.length - 1;
+  const int32_t M = csr.column_indices.length;
   const int H = num_heads;
   if (H > 64) {
     // thread block can have at most 64 threads in z dimension.
@@ -105,13 +105,13 @@ double RunBaseline1(const utils::SampleCsr& scsr,
 
   const auto& trans = Transpose(scsr);
   const auto& csr_t = utils::ToMinigunCsr(trans.first, kDLGPU);
-  mg_int* d_eid;
-  CUDA_CALL(cudaMalloc(&d_eid, sizeof(mg_int) * M));
-  CUDA_CALL(cudaMemcpy(d_eid, &trans.second[0], sizeof(mg_int) * M,
+  int32_t* d_eid;
+  CUDA_CALL(cudaMalloc(&d_eid, sizeof(int32_t) * M));
+  CUDA_CALL(cudaMemcpy(d_eid, &trans.second[0], sizeof(int32_t) * M,
         cudaMemcpyHostToDevice));
 
   // dry run
-  custom_kernel::sparse_softmax_backward_kernel<mg_int, float>
+  custom_kernel::sparse_softmax_backward_kernel<int32_t, float>
     <<<dim3(N, 1, 1), dim3(1, 256/H, H)>>>(
       csr_t.row_offsets.data,
       d_eid,
@@ -126,7 +126,7 @@ double RunBaseline1(const utils::SampleCsr& scsr,
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    custom_kernel::sparse_softmax_backward_kernel<mg_int, float>
+    custom_kernel::sparse_softmax_backward_kernel<int32_t, float>
       <<<dim3(N, 1, 1), dim3(1, 256/H, H)>>>(
         csr_t.row_offsets.data,
         d_eid,
@@ -157,12 +157,12 @@ int main(int argc, char** argv) {
 
   utils::SampleCsr scsr;
   utils::LoadGraphFromFile(filename, &scsr);
-  const mg_int N = scsr.row_offsets.size() - 1;
-  const mg_int M = scsr.column_indices.size();
+  const int32_t N = scsr.row_offsets.size() - 1;
+  const int32_t M = scsr.column_indices.size();
   std::cout << "#Nodes: " << N << " #Edges: " << M << std::endl;
 
   // csr
-  minigun::Csr csr = utils::ToMinigunCsr(scsr, kDLGPU);
+  minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
 
   double dur1 = RunMinigun(scsr, csr, 0, num_heads);
   std::cout << "minigun time(ms): " << dur1 << std::endl;

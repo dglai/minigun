@@ -16,25 +16,25 @@ struct GData {
 
 struct SPMVFunctor {
   static __device__ __forceinline__ bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     atomicAdd(gdata->next + dst, gdata->cur[src] * gdata->weight[eid]);
   }
 };
 
 std::vector<float> GroundTruth(
-    const std::vector<mg_int>& row_offsets,
-    const std::vector<mg_int>& column_indices,
+    const std::vector<int32_t>& row_offsets,
+    const std::vector<int32_t>& column_indices,
     const std::vector<float>& vdata,
     const std::vector<float>& edata,
-    const std::vector<mg_int>& infront_vec) {
+    const std::vector<int32_t>& infront_vec) {
   std::vector<float> ret(vdata.size(), 0);
-  for (const mg_int u : infront_vec) {
-    for (mg_int eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
-      mg_int v = column_indices[eid];
+  for (const int32_t u : infront_vec) {
+    for (int32_t eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
+      int32_t v = column_indices[eid];
       ret[v] += vdata[u] * edata[eid];
     }
   }
@@ -43,34 +43,34 @@ std::vector<float> GroundTruth(
 
 int main(int argc, char** argv) {
   srand(42);
-  std::vector<mg_int> row_offsets, column_indices;
+  std::vector<int32_t> row_offsets, column_indices;
   utils::CreateNPGraph(10000, 0.01, row_offsets, column_indices);
-  const mg_int N = row_offsets.size() - 1;
-  const mg_int M = column_indices.size();
+  const int32_t N = row_offsets.size() - 1;
+  const int32_t M = column_indices.size();
   std::cout << "#nodes: " << N << " #edges: " << M << std::endl;
 
   CUDA_CALL(cudaSetDevice(0));
-  minigun::Csr csr;
+  minigun::IntCsr csr;
   csr.row_offsets.length = row_offsets.size();
-  CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(mg_int) * row_offsets.size()));
+  CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(int32_t) * row_offsets.size()));
   CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &row_offsets[0],
-        sizeof(mg_int) * row_offsets.size(), cudaMemcpyHostToDevice));
+        sizeof(int32_t) * row_offsets.size(), cudaMemcpyHostToDevice));
   csr.column_indices.length = column_indices.size();
-  CUDA_CALL(cudaMalloc(&csr.column_indices.data, sizeof(mg_int) * column_indices.size()));
+  CUDA_CALL(cudaMalloc(&csr.column_indices.data, sizeof(int32_t) * column_indices.size()));
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
-        sizeof(mg_int) * column_indices.size(), cudaMemcpyHostToDevice));
+        sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
   // prepare frontiers
-  minigun::IntArray1D infront, outfront;
-  std::vector<mg_int> infront_vec;
-  for (mg_int i = 3; i < 3 + 500; ++i) {
+  minigun::IntArray infront, outfront;
+  std::vector<int32_t> infront_vec;
+  for (int32_t i = 3; i < 3 + 500; ++i) {
     infront_vec.push_back(i);
   }
   LOG(INFO) << "Input frontier size: " << infront_vec.size();
   infront.length = infront_vec.size();
-  CUDA_CALL(cudaMalloc(&infront.data, sizeof(mg_int) * infront_vec.size()));
+  CUDA_CALL(cudaMalloc(&infront.data, sizeof(int32_t) * infront_vec.size()));
   CUDA_CALL(cudaMemcpy(infront.data, &infront_vec[0],
-        sizeof(mg_int) * infront_vec.size(), cudaMemcpyHostToDevice));
+        sizeof(int32_t) * infront_vec.size(), cudaMemcpyHostToDevice));
 
   // Create stream
   minigun::advance::RuntimeConfig config;
@@ -81,10 +81,10 @@ int main(int argc, char** argv) {
 
   // Create vdata, edata and copy to GPU
   std::vector<float> vvec(N), evec(M);
-  for (mg_int i = 0; i < N; ++i) {
+  for (int32_t i = 0; i < N; ++i) {
     vvec[i] = (float)rand() / RAND_MAX;
   }
-  for (mg_int i = 0; i < M; ++i) {
+  for (int32_t i = 0; i < M; ++i) {
     evec[i] = (float)rand() / RAND_MAX;
   }
 
@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
   //utils::VecPrint(truth);
 
   typedef minigun::advance::Config<false, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
+  minigun::advance::Advance<kDLGPU, int32_t,  Config, GData, SPMVFunctor>(
       config, csr, &gdata, infront, &outfront,
       utils::GPUAllocator::Get());
 
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, Config, GData, SPMVFunctor>(
+    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMVFunctor>(
         config, csr, &gdata, infront, &outfront,
         utils::GPUAllocator::Get());
   }
