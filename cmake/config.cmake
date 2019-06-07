@@ -22,6 +22,11 @@
 # Whether build samples.
 set(BUILD_SAMPLES OFF)
 
+# Whether enable build with partial frontier support.
+# XXX: This is a temporary flag to disable costly compilation with moderngpu.
+#      We should replace it with our own implementation later.
+set(ENABLE_PARTIAL_FRONTIER ON)
+
 #---------------------------------------------
 # Backend runtimes.
 #---------------------------------------------
@@ -34,13 +39,3 @@ set(BUILD_SAMPLES OFF)
 # - /path/to/cuda: use specific path to cuda toolkit
 set(USE_CUDA OFF)
 
-#---------------------------------------------
-# Contrib libraries
-#---------------------------------------------
-# Whether use BLAS, choices: openblas, mkl, atlas, apple
-set(USE_BLAS none)
-
-# /path/to/mkl: mkl root path when use mkl blas library
-# set(USE_MKL_PATH /opt/intel/mkl) for UNIX
-# set(USE_MKL_PATH ../IntelSWTools/compilers_and_libraries_2018/windows/mkl) for WIN32
-set(USE_MKL_PATH none)

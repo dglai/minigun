@@ -6,7 +6,7 @@
 #include "./cuda_common.cuh"
 #include "./tuning.h"
 
-#if defined(CUDART_VERSION) && CUDART_VERSION < 10000
+#if ENABLE_PARTIAL_FRONTIER
 #include "./advance_lb.cuh"
 #endif
 
@@ -32,7 +32,7 @@ struct DispatchXPU<kDLGPU, Idx, Config, GData, Functor, Alloc> {
       CudaAdvanceAll<Idx, Config, GData, Functor, Alloc>(
           algo, rtcfg, csr, gdata, output_frontier, alloc);
     } else {
-#if defined(CUDART_VERSION) && CUDART_VERSION < 10000
+#if ENABLE_PARTIAL_FRONTIER
       AdvanceAlg algo = FindAdvanceAlgo<Idx, Config>(rtcfg, csr,
           input_frontier);
       CudaAdvanceExecutor<Idx, Config, GData, Functor, Alloc> exec(

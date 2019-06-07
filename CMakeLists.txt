@@ -18,6 +18,7 @@ endif()
 
 minigun_option(USE_CUDA "Build with CUDA" ON)
 minigun_option(BUILD_SAMPLES "Build minigun samples" OFF)
+minigun_option(ENABLE_PARTIAL_FRONTIER "Enable build with partial frontier support" ON)
 
 # include directories
 include_directories("minigun")
@@ -58,6 +59,10 @@ else(MSVC)
 endif(MSVC)
 
 include(cmake/modules/CUDA.cmake)
+
+if(ENABLE_PARTIAL_FRONTIER)
+  add_definitions(-DENABLE_PARTIAL_FRONTIER)
+endif(ENABLE_PARTIAL_FRONTIER)
 
 file(GLOB_RECURSE MINIGUN_SRC "minigun/minigun/*.h")
 
