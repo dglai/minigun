@@ -1,6 +1,7 @@
 #ifndef MINIGUN_CUDA_ADVANCE_LB_CUH_
 #define MINIGUN_CUDA_ADVANCE_LB_CUH_
 
+#include <moderngpu/context.hxx>
 #include <moderngpu/kernel_scan.hxx>
 #include <moderngpu/kernel_sortedsearch.hxx>
 #include <moderngpu/transform.hxx>
@@ -8,6 +9,62 @@
 #include "./cuda_common.cuh"
 
 namespace minigun {
+
+// Cuda context that is compatible with modern gpu
+template <typename Alloc>
+class MgpuContext : public mgpu::context_t {
+ public:
+  MgpuContext(int device_id, cudaStream_t stream, Alloc* alloc):
+    cuda_ctx_(CudaContext::Get(device_id)),
+    stream_(stream), alloc_(alloc) {
+    //CUDA_CALL(cudaEventCreate(&event_));
+  }
+  ~MgpuContext() {
+    //CUDA_CALL(cudaEventDestroy(event_));
+  }
+  const cudaDeviceProp& props() const override {
+    return cuda_ctx_.props();
+  } 
+  int ptx_version() const override {
+    return cuda_ctx_.ptx_version();
+  }
+  cudaStream_t stream() override {
+    return stream_;
+  }
+  void* alloc(size_t size, mgpu::memory_space_t space) override {
+    CHECK_EQ(space,  mgpu::memory_space_device);
+    return alloc_->template AllocateWorkspace<void>(size);
+  }
+  void free(void* p, mgpu::memory_space_t space) override {
+    CHECK_EQ(space,  mgpu::memory_space_device);
+    alloc_->FreeWorkspace(p);
+  }
+  void synchronize() override {
+    if (stream_) {
+      CUDA_CALL(cudaStreamSynchronize(stream_));
+    } else {
+      CUDA_CALL(cudaDeviceSynchronize());
+    }
+  }
+  cudaEvent_t event() override {
+    LOG(FATAL) << "event is not implemented.";
+    return event_;
+  }
+  void timer_begin() override {
+    LOG(FATAL) << "timer_begin is not implemented.";
+  }
+  double timer_end() override {
+    LOG(FATAL) << "timer_end is not implemented.";
+    return 0.0;
+  }
+
+ private:
+  const CudaContext& cuda_ctx_;
+  cudaStream_t stream_;
+  Alloc* alloc_;
+  cudaEvent_t event_;
+};
+
 namespace advance {
 
 #define MAX_NTHREADS 1024
