@@ -2,6 +2,7 @@
 #define MINIGUN_CUDA_ADVANCE_ALL_CUH_
 
 #include "./cuda_common.cuh"
+#include <algorithm>
 
 namespace minigun {
 namespace advance {
