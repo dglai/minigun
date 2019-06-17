@@ -101,15 +101,15 @@ __global__ void vector_spmm_forward_kernel_no_eid(
     const data_t* __restrict__ edata,
     const data_t* __restrict__ x,
     data_t* __restrict__ y,
-    const int d, const int n, const int h) {
+    const int d, const int n) {
   int i = blockIdx.x;
   int tx = threadIdx.x;
   if (i < n) {
-    for (int j = tx; j < d * h; j += blockDim.x) {
+    for (int j = tx; j < d; j += blockDim.x) {
       data_t sum = 0;
       for (int k = indptr[i]; k < indptr[i + 1]; ++k)
-        sum += edata[h + j / d] * x[indices[k] * d * h + j];
-      y[i * d * h + j] = sum;
+        sum += edata[k] * x[indices[k] * d + j];
+      y[i * d + j] = sum;
     }
   }
 }

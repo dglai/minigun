@@ -14,20 +14,23 @@ using namespace spmm;
 
 double RunMinigun(const utils::SampleCsr& scsr,
                   const minigun::IntCsr& csr,
-                  int32_t feat_size, int32_t num_heads) {
+                  int32_t feat_size) {
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+
   // gdata
   GData gdata, truth;
   gdata.D = feat_size;
-  gdata.H = num_heads;
   InitGData(scsr, &gdata, &truth);
   CUDA_CALL(cudaDeviceSynchronize());
  
   // create stream
   RuntimeConfig rtcfg;
   rtcfg.ctx = {kDLGPU, 0};
-  int nt = utils::_FindNumThreads(gdata.H * gdata.D, 64);
+  int nt = utils::_FindNumThreads(gdata.D, 64);
   rtcfg.data_num_threads = nt;
-  rtcfg.data_num_blocks = (gdata.H * gdata.D + (nt * 4) - 1) / (nt * 4);
+  rtcfg.data_num_blocks = (gdata.D + (nt * 4) - 1) / (nt * 4);
   CUDA_CALL(cudaStreamCreate(&rtcfg.stream));
 
   minigun::IntArray infront;
@@ -39,91 +42,91 @@ double RunMinigun(const utils::SampleCsr& scsr,
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
-  const int K = 10;
-  timeval t0, t1;
-  gettimeofday(&t0, nullptr);
+  CUDA_CALL(cudaDeviceSynchronize());
+  const int K = 100;
+  cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
         rtcfg, csr, &gdata, infront);
   }
+  cudaEventRecord(stop);
   CUDA_CALL(cudaDeviceSynchronize());
-  gettimeofday(&t1, nullptr);
-  double dur = (double)(t1.tv_sec * 1e6 + t1.tv_usec -
-      (t0.tv_sec * 1e6 + t0.tv_usec)) / K / 1000.0;  // ms
+  float dur = 0;
+  cudaEventElapsedTime(&dur, start, stop);
 
   FreeGData(&gdata, &truth);
 
-  return dur;
+  return dur / K;
 }
 
 double RunBaseline1(const utils::SampleCsr& scsr,
                     const minigun::IntCsr& csr,
-                    int32_t feat_size, int32_t num_heads) {
+                    int32_t feat_size) {
   const int32_t N = csr.row_offsets.length - 1;
+
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
 
    // gdata
   GData gdata, truth;
   gdata.D = feat_size;
-  gdata.H = num_heads;
   InitGData(scsr, &gdata, &truth);
 
+  int nt = utils::_FindNumThreads(gdata.D, 64);
   // dry run
-  custom_kernel::vector_spmm_forward_kernel_no_eid<int32_t, float><<<N, 32>>>(
+  custom_kernel::vector_spmm_forward_kernel_no_eid<int32_t, float><<<N, nt>>>(
       csr.row_offsets.data,
       csr.column_indices.data,
       gdata.weight,
       gdata.ndata,
       gdata.out,
-      (int)gdata.D, (int)N, (int)gdata.H);
+      (int)gdata.D, (int)N);
   CUDA_CALL(cudaDeviceSynchronize());
 
-  const int K = 10;
-  timeval t0, t1;
-  gettimeofday(&t0, nullptr);
+  const int K = 100;
+  cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
-    custom_kernel::vector_spmm_forward_kernel_no_eid<int32_t, float><<<N, 32>>>(
+    custom_kernel::vector_spmm_forward_kernel_no_eid<int32_t, float><<<N, nt>>>(
         csr.row_offsets.data,
         csr.column_indices.data,
         gdata.weight,
         gdata.ndata,
         gdata.out,
-        (int)gdata.D, (int)N, (int)gdata.H);
+        (int)gdata.D, (int)N);
   }
+  cudaEventRecord(stop);
   CUDA_CALL(cudaDeviceSynchronize());
-  gettimeofday(&t1, nullptr);
-  double dur = (double)(t1.tv_sec * 1e6 + t1.tv_usec -
-      (t0.tv_sec * 1e6 + t0.tv_usec)) / K / 1000.0;  // ms
+  float dur = 0;
+  cudaEventElapsedTime(&dur, start, stop);
 
   FreeGData(&gdata, &truth);
 
-  return dur;
+  return dur / K;
 }
 
 int main(int argc, char** argv) {
   srand(42);
-  if (argc < 4) {
-    std::cout << "USAGE: ./bench_masked_mm <file_name> <feat_size> <num_heads>" << std::endl;
+  if (argc < 3) {
+    std::cout << "USAGE: ./bench_masked_mm <file_name> <feat_size>" << std::endl;
     return 1;
   }
   const char* filename = argv[1];
   const int feat_size = std::atoi(argv[2]);
-  const int num_heads = std::atoi(argv[3]);
-  std::cout << "filename=" << filename << " feat_size=" << feat_size
-    << " num_heads=" << num_heads << std::endl;
+  //std::cout << "filename=" << filename << " feat_size=" << feat_size
 
   utils::SampleCsr scsr;
   utils::LoadGraphFromFile(filename, &scsr);
   const int32_t N = scsr.row_offsets.size() - 1;
   const int32_t M = scsr.column_indices.size();
-  std::cout << "#Nodes: " << N << " #Edges: " << M << std::endl;
+  //std::cout << "#Nodes: " << N << " #Edges: " << M << std::endl;
 
   // csr
   minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
 
-  double dur1 = RunMinigun(scsr, csr, feat_size, num_heads);
-  std::cout << "minigun time(ms): " << dur1 << std::endl;
-  double dur2 = RunBaseline1(scsr, csr, feat_size, num_heads);
-  std::cout << "baseline1 time(ms): " << dur2 << std::endl;
+  double dur1 = RunBaseline1(scsr, csr, feat_size);
+  double dur2 = RunMinigun(scsr, csr, feat_size);
+  std::cout << N << "," << M << "," << feat_size << "," << dur1 << "," << dur2 << "\n";
 
   return 0;
 }
