@@ -28,9 +28,8 @@ bool VecEqual(const std::vector<T>& v1,
   if (v1.size() != v2.size()) return false;
   for (size_t i = 0; i < v1.size(); ++i) {
     if (!(FCLOSE(v1[i], v2[i]))) {
-      std::cout << "@" << i << ": " << v1[i]
-        << " v.s. " << v2[i] << std::endl;
       return false;
+      //std::cout << "@" << i << ": " << v1[i] << " v.s. " << v2[i] << std::endl;
     }
   }
   return true;
@@ -40,8 +39,8 @@ template <typename Iter1, typename Iter2>
 bool IterEqual(Iter1 v1, Iter2 v2, size_t count) {
   for (size_t i = 0; i < count; ++i) {
     if (!(FCLOSE(v1[i], v2[i]))) {
-      std::cout << "@" << i << ": " << v1[i] << " v.s. " << v2[i] << std::endl;
       return false;
+      //std::cout << "@" << i << ": " << v1[i] << " v.s. " << v2[i] << std::endl;
     }
   }
   return true;
