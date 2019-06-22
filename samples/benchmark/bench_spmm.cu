@@ -35,15 +35,21 @@ double RunMinigun(const utils::SampleCsr& scsr,
 
   minigun::IntArray infront;
 
-  // dry run
+  // check accuracy
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
       rtcfg, csr, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
+  // warm up
+  const int K = 10;
+  for (int i = 0; i < K; ++i) {
+    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
+        rtcfg, csr, &gdata, infront);
+  }
   CUDA_CALL(cudaDeviceSynchronize());
-  const int K = 100;
+
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
@@ -73,18 +79,21 @@ double RunBaseline1(const utils::SampleCsr& scsr,
   gdata.D = feat_size;
   InitGData(scsr, &gdata, &truth);
 
-  int nt = utils::_FindNumThreads(gdata.D, 64);
-  // dry run
-  custom_kernel::vector_spmm_forward_kernel_no_eid<int32_t, float><<<N, nt>>>(
-      csr.row_offsets.data,
-      csr.column_indices.data,
-      gdata.weight,
-      gdata.ndata,
-      gdata.out,
-      (int)gdata.D, (int)N);
+  int nt = utils::_FindNumThreads(gdata.D, 512);
+
+  const int K = 10;
+  // warm up
+  for (int i = 0; i < K; ++i) {
+    custom_kernel::vector_spmm_forward_kernel_no_eid<int32_t, float><<<N, nt>>>(
+        csr.row_offsets.data,
+        csr.column_indices.data,
+        gdata.weight,
+        gdata.ndata,
+        gdata.out,
+        (int)gdata.D, (int)N);
+  }
   CUDA_CALL(cudaDeviceSynchronize());
 
-  const int K = 100;
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
     custom_kernel::vector_spmm_forward_kernel_no_eid<int32_t, float><<<N, nt>>>(
