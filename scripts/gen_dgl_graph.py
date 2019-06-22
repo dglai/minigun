@@ -10,11 +10,14 @@ def main(args):
     if args.dataset == 'segtree':
         g = build_segtree(batch_size=32, seq_len=512)
         print('#Nodes: %d #Edges: %d' % (g.number_of_nodes(), g.number_of_edges()))
-        csr = g.adjacency_matrix_scipy(fmt='csr')        
+        csr = g.adjacency_matrix_scipy(fmt='csr')
     else:
         data = load_data(args)
         g = data.graph
-        csr = nx.to_scipy_sparse_matrix(g, weight=None, format='csr')
+        if isinstance(g, dgl.DGLGraph):
+            csr = g.adjacency_matrix_scipy(transpose=True)
+        else:
+            csr = nx.to_scipy_sparse_matrix(g, weight=None, format='csr')
 
     graph_io.save_graph(args.out, csr)
 
