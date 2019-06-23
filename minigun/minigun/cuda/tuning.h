@@ -9,7 +9,7 @@ namespace advance {
 template <typename Idx, typename Config>
 AdvanceAlg FindAdvanceAllAlgo(
     const RuntimeConfig& rtcfg,
-    const Csr<Idx>& csr) {
+    const Coo<Idx>& coo) {
   // TODO(minjie): more
   return kGunrockLBOut;
 }
@@ -17,7 +17,7 @@ AdvanceAlg FindAdvanceAllAlgo(
 template <typename Idx, typename Config>
 AdvanceAlg FindAdvanceAlgo(
     const RuntimeConfig& rtcfg,
-    const Csr<Idx>& csr,
+    const Coo<Idx>& coo,
     const IntArray1D<Idx>& input_frontier) {
   // TODO(minjie): more
   return kGunrockLBOut;

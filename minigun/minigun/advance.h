@@ -65,7 +65,7 @@ template <int XPU,
 struct DispatchXPU {
   static void Advance(
       const RuntimeConfig& config,
-      const Csr<Idx>& csr,
+      const Coo<Idx>& coo,
       GData* gdata,
       IntArray1D<Idx> input_frontier,
       IntArray1D<Idx>* output_frontier,
@@ -101,7 +101,7 @@ template <int XPU,
           typename Functor,
           typename Alloc = DefaultAllocator<XPU> >
 void Advance(const RuntimeConfig& config,
-             const Csr<Idx>& csr,
+             const Coo<Idx>& coo,
              GData* gdata,
              IntArray1D<Idx> input_frontier,
              IntArray1D<Idx>* output_frontier = nullptr,
@@ -111,7 +111,7 @@ void Advance(const RuntimeConfig& config,
     LOG(FATAL) << "Require computing output frontier but no buffer is provided.";
   }
   DispatchXPU<XPU, Idx, Config, GData, Functor, Alloc>::Advance(
-      config, csr, gdata,
+      config, coo, gdata,
       input_frontier, output_frontier, alloc);
 }
 
@@ -121,7 +121,7 @@ void Advance(const RuntimeConfig& config,
 #ifdef __CUDACC__
 #include "./cuda/advance.cuh"
 #else
-#include "./cpu/advance.h"
+//#include "./cpu/advance.h"
 #endif
 
 #endif  // MINIGUN_ADVANCE_H_

@@ -83,7 +83,7 @@ void CheckResult(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   float* h_out = new float[N * D];
   CUDA_CALL(cudaMemcpy(h_out, gdata->out, sizeof(float) * N * D, cudaMemcpyDeviceToHost));
   bool equal = utils::IterEqual(h_out, truth->out, N * D);
-  //assert(equal);
+  assert(equal);
   //std::cout << "Correct? " << equal << std::endl;
   delete [] h_out;
 }

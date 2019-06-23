@@ -13,7 +13,7 @@ using minigun::advance::RuntimeConfig;
 using namespace spmm;
 
 double RunMinigun(const utils::SampleCsr& scsr,
-                  const minigun::IntCsr& csr,
+                  const minigun::IntCoo& coo,
                   int32_t feat_size) {
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
@@ -38,7 +38,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
   // check accuracy
   typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
-      rtcfg, csr, &gdata, infront);
+      rtcfg, coo, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -46,14 +46,14 @@ double RunMinigun(const utils::SampleCsr& scsr,
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
-        rtcfg, csr, &gdata, infront);
+        rtcfg, coo, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
 
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
-        rtcfg, csr, &gdata, infront);
+        rtcfg, coo, &gdata, infront);
   }
   cudaEventRecord(stop);
   CUDA_CALL(cudaDeviceSynchronize());
@@ -132,9 +132,10 @@ int main(int argc, char** argv) {
 
   // csr
   minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
+  minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
 
   double dur1 = RunBaseline1(scsr, csr, feat_size);
-  double dur2 = RunMinigun(scsr, csr, feat_size);
+  double dur2 = RunMinigun(scsr, coo, feat_size);
   std::cout << N << "," << M << "," << feat_size << "," << dur1 << "," << dur2 << "\n";
 
   return 0;

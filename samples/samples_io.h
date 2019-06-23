@@ -49,6 +49,35 @@ __inline__ bool LoadGraphFromFile(const char* filename, utils::SampleCsr* out_cs
   return ret;
 }
 
+// create a minigun Coo that copies the given sample csr memory
+__inline__ minigun::IntCoo ToMinigunCoo(const SampleCsr& sample_csr, DLDeviceType device) {
+  minigun::IntCoo coo;
+  const size_t n_edge = sample_csr.column_indices.size();
+  if (device == kDLCPU) {
+    assert(0);
+#ifdef __CUDACC__
+  } else if (device == kDLGPU) {
+    int32_t* row = new int32_t[n_edge];
+    for (size_t row_id = 0; row_id < sample_csr.row_offsets.size() - 1; ++row_id) {
+      for (size_t edge_id = sample_csr.row_offsets[row_id]; edge_id < sample_csr.row_offsets[row_id + 1]; ++edge_id) {
+        row[edge_id] = row_id;
+      }
+    }
+    coo.row.length = n_edge;
+    CUDA_CALL(cudaMalloc(&coo.row.data, n_edge* sizeof(int32_t)));
+    CUDA_CALL(cudaMemcpy(coo.row.data, row,
+          sizeof(int32_t) * n_edge, cudaMemcpyHostToDevice));
+    coo.column.length = n_edge;
+    CUDA_CALL(cudaMalloc(&coo.column.data, n_edge* sizeof(int32_t)));
+    CUDA_CALL(cudaMemcpy(coo.column.data, &sample_csr.column_indices[0],
+          sizeof(int32_t) * n_edge, cudaMemcpyHostToDevice));
+    delete []row;
+#endif  // __CUDACC__
+  } else {
+    LOG(INFO) << "Unsupported device: " << device;
+  }
+  return coo;
+}
 // create a minigun Csr that copies the given sample csr memory
 __inline__ minigun::IntCsr ToMinigunCsr(const SampleCsr& sample_csr, DLDeviceType device) {
   minigun::IntCsr csr;
