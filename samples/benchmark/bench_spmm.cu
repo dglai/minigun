@@ -48,7 +48,6 @@ double RunMinigun(const utils::SampleCsr& scsr,
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
         rtcfg, coo, &gdata, infront);
   }
-  CUDA_CALL(cudaDeviceSynchronize());
 
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
@@ -56,7 +55,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
         rtcfg, coo, &gdata, infront);
   }
   cudaEventRecord(stop);
-  CUDA_CALL(cudaDeviceSynchronize());
+  CUDA_CALL(cudaEventSynchronize(stop));
   float dur = 0;
   cudaEventElapsedTime(&dur, start, stop);
 
@@ -92,7 +91,6 @@ double RunBaseline1(const utils::SampleCsr& scsr,
         gdata.out,
         (int)gdata.D, (int)N);
   }
-  CUDA_CALL(cudaDeviceSynchronize());
 
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
@@ -105,7 +103,7 @@ double RunBaseline1(const utils::SampleCsr& scsr,
         (int)gdata.D, (int)N);
   }
   cudaEventRecord(stop);
-  CUDA_CALL(cudaDeviceSynchronize());
+  CUDA_CALL(cudaEventSynchronize(stop));
   float dur = 0;
   cudaEventElapsedTime(&dur, start, stop);
 
@@ -134,7 +132,8 @@ int main(int argc, char** argv) {
   minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
   minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
 
-  double dur1 = RunBaseline1(scsr, csr, feat_size);
+  //double dur1 = RunBaseline1(scsr, csr, feat_size);
+  double dur1 = 0;
   double dur2 = RunMinigun(scsr, coo, feat_size);
   std::cout << N << "," << M << "," << feat_size << "," << dur1 << "," << dur2 << "\n";
 

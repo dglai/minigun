@@ -2,7 +2,6 @@
 #define MINIGUN_CUDA_ADVANCE_ALL_CUH_
 
 #include "./cuda_common.cuh"
-#include <assert.h>
 
 namespace minigun {
 namespace advance {
@@ -49,8 +48,8 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     Idx src = _ldg(coo.row.data + eid);
     Idx dst = _ldg(coo.column.data + eid);
     if (src + dst < 0) {
-      // garbage code to prevent compiler from optimizing out src and dst
-      eid = -1;
+      // garbage code that cannot be optimized out but will never be executed
+      gdata.out[0] = -1;
     }
     if (Functor::CondEdge(src, dst, eid, &gdata)) {
       Functor::ApplyEdge(src, dst, eid, &gdata);
