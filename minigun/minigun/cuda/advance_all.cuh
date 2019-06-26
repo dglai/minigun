@@ -2,6 +2,7 @@
 #define MINIGUN_CUDA_ADVANCE_ALL_CUH_
 
 #include "./cuda_common.cuh"
+#include <assert.h>
 
 namespace minigun {
 namespace advance {
@@ -47,6 +48,10 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     //   when the thread is processing the neighbor list of a new node.
     Idx src = _ldg(coo.row.data + eid);
     Idx dst = _ldg(coo.column.data + eid);
+    if (src + dst < 0) {
+      // garbage code to prevent compiler from optimizing out src and dst
+      eid = -1;
+    }
     if (Functor::CondEdge(src, dst, eid, &gdata)) {
       Functor::ApplyEdge(src, dst, eid, &gdata);
       // Add dst/eid to output frontier
@@ -84,8 +89,10 @@ void CudaAdvanceAllGunrockLBOut(
   const int by = std::min((M + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-    //<< nthrs.x << "," << nthrs.y << ")";
+  /*
+  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+    << nthrs.x << "," << nthrs.y << ")";
+  */
   CudaAdvanceAllGunrockLBOutKernel<Idx, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(coo, *gdata, output_frontier);
 }
