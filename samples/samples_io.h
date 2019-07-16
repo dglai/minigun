@@ -109,6 +109,67 @@ __inline__ minigun::IntCsr ToMinigunCsr(const SampleCsr& sample_csr, DLDeviceTyp
   return csr;
 }
 
+std::vector<int32_t*> transpose(const SampleCsr& sample_csr) {
+  const size_t n_v = sample_csr.row_offsets.size() - 1;
+  const size_t n_e = sample_csr.column_indices.size();
+  int32_t* row = new int32_t[n_v + 1];
+  int32_t* col = new int32_t[n_e];
+  memset(row, 0, (n_v + 1) * sizeof(int32_t));
+  memset(col, 0, (n_e) * sizeof(int32_t));
+  // transpose
+  // edge count
+  for (size_t i = 0; i < n_e; ++i) {
+    row[sample_csr.column_indices[i] + 1]++;
+  }
+  // cumsum on row pointer
+  for (size_t i = 0; i < n_v; ++i) {
+    row[i+1] += row[i];
+  }
+  // fill in edges
+  for (size_t u = 0; u < n_v; ++u) {
+    for (int32_t eid = sample_csr.row_offsets[u]; eid < sample_csr.row_offsets[u + 1]; ++eid) {
+      int32_t v = sample_csr.column_indices[eid];
+      col[row[v]++] = u;
+    }
+  }
+  // reset row pointer
+  for (size_t u = n_v - 1; u > 0; --u) {
+    row[u] = row[u-1];
+  }
+  row[0] = 0;
+  return {row, col};
+}
+
+minigun::IntCsr ToMinigunReverseCsr(const SampleCsr& sample_csr, DLDeviceType device) {
+  minigun::IntCsr csr;
+  const size_t n_v = sample_csr.row_offsets.size() - 1;
+  const size_t n_e = sample_csr.column_indices.size();
+  auto csr_t = transpose(sample_csr);
+  int32_t* row = csr_t[0];
+  int32_t* col = csr_t[1];
+
+  if (device == kDLCPU) {
+    csr.row_offsets.length = n_v + 1;
+    csr.row_offsets.data = row;
+    csr.column_indices.length = n_e;
+    csr.column_indices.data = col;
+#ifdef __CUDACC__
+  } else if (device == kDLGPU) {
+    csr.row_offsets.length = n_v + 1;
+    CUDA_CALL(cudaMalloc(&csr.row_offsets.data, (n_v + 1) * sizeof(int32_t)));
+    CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &row[0],
+          sizeof(int32_t) * (n_v + 1), cudaMemcpyHostToDevice));
+    csr.column_indices.length = n_e;
+    CUDA_CALL(cudaMalloc(&csr.column_indices.data, n_e* sizeof(int32_t)));
+    CUDA_CALL(cudaMemcpy(csr.column_indices.data, &col[0],
+          sizeof(int32_t) * n_e, cudaMemcpyHostToDevice));
+#endif  // __CUDACC__
+  } else {
+    LOG(INFO) << "Unsupported device: " << device;
+  }
+  return csr;
+}
+
 // create a sample csr that COPIES the memory of the minigun csr
 __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr) {
   SampleCsr csr;

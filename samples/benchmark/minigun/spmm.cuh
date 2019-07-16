@@ -45,7 +45,8 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
     ndata[i] = (float)rand() / RAND_MAX;
   }
   for (size_t i = 0; i < weight.size(); ++i) {
-    weight[i] = (float)rand() / RAND_MAX;
+    // XXX: weight has to be the same across edges because transpose function did not change weights
+    weight[i] = 3.45;
   }
   CUDA_CALL(cudaMalloc(&(gdata->ndata), sizeof(float) * ndata.size()));
   CUDA_CALL(cudaMemcpy(gdata->ndata, &ndata[0],
@@ -69,6 +70,10 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   }
 }
 
+void ResetGData(GData* gdata, size_t N) {
+  cudaMemset(gdata->out, 0, gdata->D * N *sizeof(float));
+}
+
 void FreeGData(GData* gdata, GData* truth) {
   CUDA_CALL(cudaFree(gdata->ndata));
   CUDA_CALL(cudaFree(gdata->weight));
@@ -83,7 +88,19 @@ void CheckResult(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   float* h_out = new float[N * D];
   CUDA_CALL(cudaMemcpy(h_out, gdata->out, sizeof(float) * N * D, cudaMemcpyDeviceToHost));
   bool equal = utils::IterEqual(h_out, truth->out, N * D);
-  //assert(equal);
+  /*
+  if (!equal) {
+    for (int i = 0; i < N; ++i) {
+      std::cout << h_out[i] << " ";
+    }
+    std::cout << "\n";
+    for (int i = 0; i < N; ++i) {
+      std::cout << truth->out[i] << " ";
+    }
+    std::cout << "\n";
+  }
+  */
+  assert(equal);
   //std::cout << "Correct? " << equal << std::endl;
   delete [] h_out;
 }
