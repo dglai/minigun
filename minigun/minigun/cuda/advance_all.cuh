@@ -63,7 +63,7 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     }
     eid += stride_y;
   }
-};
+}
 
 template <typename Idx,
           typename Config,
@@ -93,12 +93,62 @@ void CudaAdvanceAllGunrockLBOut(
 template <typename Idx,
           typename Config,
           typename GData,
+          typename Functor>
+__global__ void CudaAdvanceAllNodeParallelKernel(
+    Csr<Idx> csc,
+    GData gdata) {
+  Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
+  Idx stride_y = blockDim.y * gridDim.y;
+  Idx dst = ty;
+  while (dst < csr.row_offsets.length - 1) {
+    Idx start = _ldg(csr.row_offsets.data + src);
+    Idx end = _ldg(csr.row_offsets.data + src + 1);
+    for (Idx eid = start; eid < end; ++eid) {
+      Idx src = _ldg(csr.column_indices.data + eid);
+      if (Functor::CondEdge(src, dst, eid, &gdata)) {
+        Functor::ApplyEdge(src, dst, eid, &gdata);
+      }
+    }
+    dst += stride_y;
+  }
+}
+
+template <typename Idx,
+          typename Config,
+          typename GData,
+          typename Functor,
+          typename Alloc>
+void CudaAdvanceAllNodeParallel(
+    const RuntimeConfig& rtcfg,
+    const Csr<Idx>& csr,
+    GData* gdata,
+    IntArray1D<Idx> output_frontier,
+    Alloc* alloc) {
+  CHECK_GT(rtcfg.data_num_blocks, 0);
+  CHECK_GT(rtcfg.data_num_threads, 0);
+  const Idx M = csr.column_indices.length;
+  const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
+  const int ny = ty * PER_THREAD_WORKLOAD;
+  const int by = std::min((M + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
+  const dim3 nblks(rtcfg.data_num_blocks, by);
+  const dim3 nthrs(rtcfg.data_num_threads, ty);
+  //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+    //<< nthrs.x << "," << nthrs.y << ")";
+  CudaAdvanceAllGunrockNodeParallelKernel<Idx, Config, GData, Functor>
+    <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata);
+}
+
+template <typename Idx,
+          typename Config,
+          typename GData,
           typename Functor,
           typename Alloc>
 void CudaAdvanceAll(
     AdvanceAlg algo,
     const RuntimeConfig& rtcfg,
     const Csr<Idx>& csr,
+    const Csr<Idx>& csc,
+    const Coo<Idx>& coo,
     GData* gdata,
     IntArray1D<Idx>* output_frontier,
     Alloc* alloc) {
@@ -119,8 +169,20 @@ void CudaAdvanceAll(
   IntArray1D<Idx> outbuf = (output_frontier)? *output_frontier : IntArray1D<Idx>();
   switch (algo) {
     case kGunrockLBOut :
-      CudaAdvanceAllGunrockLBOut<Idx, Config, GData, Functor, Alloc>(
-          rtcfg, csr, gdata, outbuf, alloc);
+      switch (Config::kParallel) {
+        case kSRC:
+          CudaAdvanceAllNodeParallel<Idx, Config, GData, Functor, Alloc>(
+              rtcfg, csr, gdata, outbuf, alloc);
+          break;
+        case kEDGE:
+          CudaAdvanceAllGunrockLBOut<Idx, Config, GData, Functor, Alloc>(
+              rtcfg, coo, gdata, outbuf, alloc);
+          break;
+        case kDST:
+          CudaAdvanceAllNodeParallel<Idx, Config, GData, Functor, Alloc>(
+              rtcfg, csc, gdata, outbuf, alloc);
+          break;
+      }
       break;
     default:
       LOG(FATAL) << "Algorithm " << algo << " is not supported.";

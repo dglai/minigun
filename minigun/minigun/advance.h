@@ -42,14 +42,22 @@ enum FrontierMode {
   kE2V,      // in front contains eids, out front contains vids
 };
 
+enum ParallelMode {
+  kSRC = 0, // Node parallel(by source).
+  kEDGE,    // Edge parallel.
+  kDST,     // Node parallel(by destination).
+};
+
 // Static config of advance kernel
 template <bool ADVANCE_ALL,
-          FrontierMode MODE>
+          FrontierMode MODE,
+          ParallelMode PARALLEL>
 struct Config {
   // if true, the advance is applied on all the nodes
   static const bool kAdvanceAll = ADVANCE_ALL;
   // frontier mode
   static const FrontierMode kMode = MODE;
+  static const ParallelMode kParallel = PARALLEL;
 };
 
 /*!

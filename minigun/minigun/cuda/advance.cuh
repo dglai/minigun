@@ -22,6 +22,7 @@ struct DispatchXPU<kDLGPU, Idx, Config, GData, Functor, Alloc> {
   static void Advance(
       const RuntimeConfig& rtcfg,
       const Csr<Idx>& csr,
+      const Csr<Idx>& csc,
       GData* gdata,
       IntArray1D<Idx> input_frontier,
       IntArray1D<Idx>* output_frontier,
@@ -30,7 +31,7 @@ struct DispatchXPU<kDLGPU, Idx, Config, GData, Functor, Alloc> {
     if (Config::kAdvanceAll) {
       AdvanceAlg algo = FindAdvanceAllAlgo<Idx, Config>(rtcfg, csr);
       CudaAdvanceAll<Idx, Config, GData, Functor, Alloc>(
-          algo, rtcfg, csr, gdata, output_frontier, alloc);
+          algo, rtcfg, csr, csc, gdata, output_frontier, alloc);
     } else {
 #if ENABLE_PARTIAL_FRONTIER
       AdvanceAlg algo = FindAdvanceAlgo<Idx, Config>(rtcfg, csr,
