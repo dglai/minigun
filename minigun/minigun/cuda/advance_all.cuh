@@ -14,6 +14,7 @@ namespace advance {
 // Binary search the row_offsets to find the source node of the edge id.
 template <typename Idx>
 __device__ __forceinline__ Idx BinarySearchSrc(const IntArray1D<Idx>& array, Idx eid) {
+  assert(0);
   Idx lo = 0, hi = array.length - 1;
   while (lo < hi) {
     Idx mid = (lo + hi) >> 1;
@@ -36,17 +37,21 @@ template <typename Idx,
           typename GData,
           typename Functor>
 __global__ void CudaAdvanceAllGunrockLBOutKernel(
-    Csr<Idx> csr,
+    Coo<Idx> coo,
     GData gdata,
     IntArray1D<Idx> output_frontier) {
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
   Idx stride_y = blockDim.y * gridDim.y;
   Idx eid = ty;
-  while (eid < csr.column_indices.length) {
+  while (eid < coo.column.length) {
     // TODO(minjie): this is pretty inefficient; binary search is needed only
     //   when the thread is processing the neighbor list of a new node.
-    Idx src = BinarySearchSrc(csr.row_offsets, eid);
-    Idx dst = _ldg(csr.column_indices.data + eid);
+    Idx src = _ldg(coo.row.data + eid);
+    Idx dst = _ldg(coo.column.data + eid);
+    if (src + dst < 0) {
+      // garbage code that cannot be optimized out but will never be executed
+      gdata.out[0] = -1;
+    }
     if (Functor::CondEdge(src, dst, eid, &gdata)) {
       Functor::ApplyEdge(src, dst, eid, &gdata);
       // Add dst/eid to output frontier
@@ -72,22 +77,24 @@ template <typename Idx,
           typename Alloc>
 void CudaAdvanceAllGunrockLBOut(
     const RuntimeConfig& rtcfg,
-    const Csr<Idx>& csr,
+    const Coo<Idx>& coo,
     GData* gdata,
     IntArray1D<Idx> output_frontier,
     Alloc* alloc) {
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
-  const Idx M = csr.column_indices.length;
+  const Idx M = coo.column.length;
   const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
   const int by = std::min((M + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-    //<< nthrs.x << "," << nthrs.y << ")";
+  /*
+  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+    << nthrs.x << "," << nthrs.y << ")";
+  */
   CudaAdvanceAllGunrockLBOutKernel<Idx, Config, GData, Functor>
-    <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata, output_frontier);
+    <<<nblks, nthrs, 0, rtcfg.stream>>>(coo, *gdata, output_frontier);
 }
 
 template <typename Idx,
@@ -152,7 +159,7 @@ void CudaAdvanceAll(
     GData* gdata,
     IntArray1D<Idx>* output_frontier,
     Alloc* alloc) {
-  Idx out_len = csr.column_indices.length;
+  Idx out_len = coo.column.length;
   if (output_frontier) {
     if (output_frontier->data == nullptr) {
       // Allocate output frointer buffer, the length is equal to the number

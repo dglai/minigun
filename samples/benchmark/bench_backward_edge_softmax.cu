@@ -33,7 +33,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
   minigun::IntArray infront;
 
   // dry run
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxAccum>(
       rtcfg, csr, &gdata, infront);
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxMinus>(

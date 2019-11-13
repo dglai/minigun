@@ -125,6 +125,8 @@ struct DispatchXPU<kDLCPU, Idx, Config, GData, Functor, Alloc> {
   static void Advance(
       const RuntimeConfig& rtcfg,
       const Csr<Idx>& csr,
+      const Csr<Idx>& csc,
+      const Coo<Idx>& coo,
       GData* gdata,
       IntArray1D<Idx> input_frontier,
       IntArray1D<Idx>* output_frontier,

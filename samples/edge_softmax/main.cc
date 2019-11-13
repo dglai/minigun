@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLCPU, int32_t, Config, GData, EdgeMax>(
       config, csr, &gdata, infront);
   minigun::advance::Advance<kDLCPU, int32_t, Config, GData, MinuxMaxExpSum>(

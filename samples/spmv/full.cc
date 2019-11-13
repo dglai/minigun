@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
       vvec, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
       config, csr, &gdata, infront, nullptr,
       utils::CPUAllocator::Get());

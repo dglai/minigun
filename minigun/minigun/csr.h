@@ -27,6 +27,14 @@ struct Csr {
 using IntCsr = Csr<int32_t>;
 using LongCsr = Csr<int64_t>;
 
+template <typename Idx>
+struct Coo {
+  IntArray1D<Idx> row;
+  IntArray1D<Idx> column;
+};
+using IntCoo = Coo<int32_t>;
+using LongCoo = Coo<int64_t>;
+
 }  // namespace minigun
 
 #endif  // MINIGUN_CSR_H_
