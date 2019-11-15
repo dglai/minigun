@@ -54,7 +54,15 @@ __inline__ minigun::IntCoo ToMinigunCoo(const SampleCsr& sample_csr, DLDeviceTyp
   minigun::IntCoo coo;
   const size_t n_edge = sample_csr.column_indices.size();
   if (device == kDLCPU) {
-    assert(0);
+    coo.row.length = n_edge;
+    coo.row.data = new int32_t[n_edge];
+    coo.column.data = new int32_t[n_edge];
+    for (sizt_t row_id = 0; row_id < sample_csr.row_offsets.size() - 1; ++row_id) {
+      for (size_t edge_id = sample_csr.row_offsets[row_id]; edge_id < sample_csr.row_offsets[row_id + 1]; ++edge_id) {
+        coo.row.data[edge_id] = row_id;
+        coo.column.data[edge_id] = sample_csr.column_indices[edge_id];
+      }
+    }
 #ifdef __CUDACC__
   } else if (device == kDLGPU) {
     int32_t* row = new int32_t[n_edge];
