@@ -170,6 +170,11 @@ minigun::IntCsr ToMinigunReverseCsr(const SampleCsr& sample_csr, DLDeviceType de
   return csr;
 }
 
+minigun::IntCsr ToReverseCsr(const minigun::IntCsr& mg_csr, DLDeviceType device) {
+  SampleCsr scsr = ToSampleCsr(mg_csr);
+  return ToMinigunReverseCsr(scsr, device);
+}
+
 // create a sample csr that COPIES the memory of the minigun csr
 __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr) {
   SampleCsr csr;
