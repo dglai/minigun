@@ -43,9 +43,9 @@ enum FrontierMode {
 };
 
 enum ParallelMode {
-  kSRC = 0, // Node parallel(by source).
-  kEDGE,    // Edge parallel.
-  kDST,     // Node parallel(by destination).
+  kSrc = 0, // Node parallel(by source).
+  kEdge,    // Edge parallel.
+  kDst,     // Node parallel(by destination).
 };
 
 // Static config of advance kernel
