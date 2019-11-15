@@ -170,16 +170,6 @@ minigun::IntCsr ToMinigunReverseCsr(const SampleCsr& sample_csr, DLDeviceType de
   return csr;
 }
 
-minigun::IntCsr ToReverseCsr(const minigun::IntCsr& mg_csr, DLDeviceType device) {
-  SampleCsr scsr = ToSampleCsr(mg_csr);
-  return ToMinigunReverseCsr(scsr, device);
-}
-
-minigun::IntCoo ToCoo(const minigun::IntCoo& mg_csr, DLDeviceType device) {
-  SampleCsr scsr = ToSampleCsr(mg_csr);
-  return ToMinigunCoo(scsr, device);
-}
-
 // create a sample csr that COPIES the memory of the minigun csr
 __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr) {
   SampleCsr csr;
@@ -190,6 +180,16 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr) {
   std::copy(mg_csr.column_indices.data, mg_csr.column_indices.data + mg_csr.column_indices.length,
             csr.column_indices.begin());
   return csr;
+}
+
+minigun::IntCsr ToReverseCsr(const minigun::IntCsr& mg_csr, DLDeviceType device) {
+  SampleCsr scsr = ToSampleCsr(mg_csr);
+  return ToMinigunReverseCsr(scsr, device);
+}
+
+minigun::IntCoo ToCoo(const minigun::IntCoo& mg_csr, DLDeviceType device) {
+  SampleCsr scsr = ToSampleCsr(mg_csr);
+  return ToMinigunCoo(scsr, device);
 }
 
 }  // namespace utils
