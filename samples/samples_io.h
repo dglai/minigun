@@ -187,7 +187,7 @@ minigun::IntCsr ToReverseCsr(const minigun::IntCsr& mg_csr, DLDeviceType device)
   return ToMinigunReverseCsr(scsr, device);
 }
 
-minigun::IntCoo ToCoo(const minigun::IntCoo& mg_csr, DLDeviceType device) {
+minigun::IntCoo ToCoo(const minigun::IntCsr& mg_csr, DLDeviceType device) {
   SampleCsr scsr = ToSampleCsr(mg_csr);
   return ToMinigunCoo(scsr, device);
 }
