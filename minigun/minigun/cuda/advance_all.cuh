@@ -102,7 +102,7 @@ template <typename Idx,
           typename GData,
           typename Functor>
 __global__ void CudaAdvanceAllNodeParallelKernel(
-    Csr<Idx> csc,
+    Csr<Idx> csr_t,
     GData gdata) {
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
   Idx stride_y = blockDim.y * gridDim.y;
@@ -154,7 +154,7 @@ void CudaAdvanceAll(
     AdvanceAlg algo,
     const RuntimeConfig& rtcfg,
     const Csr<Idx>& csr,
-    const Csr<Idx>& csc,
+    const Csr<Idx>& csr_t,
     const Coo<Idx>& coo,
     GData* gdata,
     IntArray1D<Idx>* output_frontier,
@@ -187,7 +187,7 @@ void CudaAdvanceAll(
           break;
         case kDST:
           CudaAdvanceAllNodeParallel<Idx, Config, GData, Functor, Alloc>(
-              rtcfg, csc, gdata, outbuf, alloc);
+              rtcfg, csr_t, gdata, outbuf, alloc);
           break;
       }
       break;

@@ -166,7 +166,7 @@ minigun::IntCsr ToMinigunReverseCsr(const SampleCsr& sample_csr, DLDeviceType de
 #endif  // __CUDACC__
   } else {
     LOG(INFO) << "Unsupported device: " << device;
-  }
+
   return csr;
 }
 

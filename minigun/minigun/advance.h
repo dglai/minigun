@@ -73,6 +73,8 @@ template <int XPU,
 struct DispatchXPU {
   static void Advance(
       const RuntimeConfig& config,
+      const Csr<Idx>& csr,
+      const Csr<Idx>& csr_t,
       const Coo<Idx>& coo,
       GData* gdata,
       IntArray1D<Idx> input_frontier,
@@ -110,7 +112,7 @@ template <int XPU,
           typename Alloc = DefaultAllocator<XPU> >
 void Advance(const RuntimeConfig& config,
              const Csr<Idx>& csr,
-             const Csr<Idx>& csc,
+             const Csr<Idx>& csr_t,
              const Coo<Idx>& coo,
              GData* gdata,
              IntArray1D<Idx> input_frontier,
@@ -121,7 +123,7 @@ void Advance(const RuntimeConfig& config,
     LOG(FATAL) << "Require computing output frontier but no buffer is provided.";
   }
   DispatchXPU<XPU, Idx, Config, GData, Functor, Alloc>::Advance(
-      config, coo, gdata,
+      config, csr, csr_t, coo, gdata,
       input_frontier, output_frontier, alloc);
 }
 
