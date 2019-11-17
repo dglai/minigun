@@ -107,11 +107,11 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
   Idx stride_y = blockDim.y * gridDim.y;
   Idx dst = ty;
-  while (dst < csr.row_offsets.length - 1) {
-    Idx start = _ldg(csr.row_offsets.data + src);
-    Idx end = _ldg(csr.row_offsets.data + src + 1);
+  while (dst < csr_t.row_offsets.length - 1) {
+    Idx start = _ldg(csr_t.row_offsets.data + dst);
+    Idx end = _ldg(csr_t.row_offsets.data + dst + 1);
     for (Idx eid = start; eid < end; ++eid) {
-      Idx src = _ldg(csr.column_indices.data + eid);
+      Idx src = _ldg(csr_t.column_indices.data + eid);
       if (Functor::CondEdge(src, dst, eid, &gdata)) {
         Functor::ApplyEdge(src, dst, eid, &gdata);
       }
