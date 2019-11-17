@@ -15,6 +15,7 @@ struct GData {
   float* score{nullptr};
 };
 
+/*
 __device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
   uint32_t* addr_as_ui = reinterpret_cast<uint32_t*>(addr);
   uint32_t old = *addr_as_ui;
@@ -26,6 +27,7 @@ __device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
   } while (assumed != old);
   return __uint_as_float(old);
 }
+*/
 
 // Max
 struct EdgeMax {
@@ -39,7 +41,10 @@ struct EdgeMax {
     int32_t stride_x = blockDim.x * gridDim.x;
     const int32_t dim = gdata->dim;
     while (tx < dim) {
-      MyAtomicMax(gdata->max + dst * dim + tx, gdata->score[eid * dim + tx]);
+      gdata->max[dst * dim + tx] = max(
+          gdata->max[dst * dim + dst * dim + tx],
+          gdata->score[eid * dim + tx];
+          );
       tx += stride_x;
     }
   }
@@ -59,7 +64,7 @@ struct MinuxMaxExpSum {
     while (tx < dim) {
       gdata->score[eid * dim + tx] = expf(
           gdata->score[eid * dim + tx] - gdata->max[dst * dim + tx]);
-      atomicAdd(gdata->sum + dst * dim + tx, gdata->score[eid * dim + tx]);
+      gdata->sum[dst * dim + tx] += gdata->score[eid * dim + tx];
       tx += stride_x;
     }
   }
@@ -134,6 +139,12 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
+  // Create csr_t and coo
+  minigun::IntCsr csr_t;
+  csr_t = utils::ToReverseCsr(csr, kDLGPU);
+  minigun::IntCoo coo;
+  coo = utils::ToCoo(csr, kDLGPU);
+
   // Create stream
   minigun::advance::RuntimeConfig config;
   config.ctx = {kDLGPU, 0};
@@ -168,13 +179,13 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
-      config, csr, &gdata, infront);
+      config, csr, csr_t, coo, &gdata, infront);
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinuxMaxExpSum>(
-      config, csr, &gdata, infront);
+      config, csr, csr_t, coo, &gdata, infront);
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, Norm>(
-      config, csr, &gdata, infront);
+      config, csr, csr_t, coo, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 

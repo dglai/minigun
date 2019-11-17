@@ -34,7 +34,7 @@ struct BackSoftmaxAccum {
     float* ret_off = gdata->out + eid * H;
     while (h < H) {
       float sds = __ldg(score_off + h) * __ldg(grad_score_off + h);
-      atomicAdd(accum_off + h, sds);
+      accum_off[h] += sds;
       *(ret_off + h) = sds;
       h += stride_h;
     }

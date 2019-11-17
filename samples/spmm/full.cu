@@ -24,8 +24,12 @@ struct SPMMFunctor {
     int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t stride_x = blockDim.x * gridDim.x;
     while (tx < gdata->dim) {
+      gdata->next[dst * gdata->dim + tx] =
+          gdata->cur[src * gdata->dim + tx] * gdata->weight[eid];
+      /*
       atomicAdd(gdata->next + dst * gdata->dim + tx,
                 gdata->cur[src * gdata->dim + tx] * gdata->weight[eid]);
+      */
       tx += stride_x;
     }
   }
@@ -74,6 +78,12 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
+  // Create csr_t and coo
+  minigun::IntCsr csr_t;
+  csr_t = utils::ToReverseCsr(csr, kDLGPU);
+  minigun::IntCoo coo;
+  coo = utils::ToCoo(csr, kDLGPU);
+
   // Create stream
   minigun::advance::RuntimeConfig config;
   config.ctx = {kDLGPU, 0};
@@ -107,9 +117,9 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge, minigun::advance::kEdge> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge, minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
-      config, csr, &gdata, infront, nullptr);
+      config, csr, csr_t, coo, &gdata, infront, nullptr);
 
   CUDA_CALL(cudaDeviceSynchronize());
 

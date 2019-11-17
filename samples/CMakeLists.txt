@@ -1,5 +1,5 @@
 #add_subdirectory(benchmark)
-#add_subdirectory(spmv)
-#add_subdirectory(spmm)
-#add_subdirectory(masked_mm)
+add_subdirectory(spmv)
+add_subdirectory(spmm)
+add_subdirectory(masked_mm)
 add_subdirectory(edge_softmax)

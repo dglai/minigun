@@ -15,6 +15,7 @@ struct GData {
   float* ret{nullptr};
 };
 
+/*
 __device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
   uint32_t* addr_as_ui = reinterpret_cast<uint32_t*>(addr);
   uint32_t old = *addr_as_ui;
@@ -26,6 +27,7 @@ __device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
   } while (assumed != old);
   return __uint_as_float(old);
 }
+*/
 
 // Max
 struct EdgeMax {
@@ -41,7 +43,7 @@ struct EdgeMax {
     float* inoff = gdata->score + eid * H;
     float* outoff = gdata->max + dst * H;
     while (tx < H) {
-      MyAtomicMax(outoff + tx, __ldg(inoff + tx));
+      *(outoff + tx) = max(*(outoff + tx) , __ldg(inoff + tx));
       tx += stride_x;
     }
   }
@@ -64,7 +66,7 @@ struct MinusMaxExpSum {
     float* sum_off = gdata->sum + dst * H;
     while (tx < H) {
       const float new_score = expf(__ldg(score_off + tx) - __ldg(max_off + tx));
-      atomicAdd(sum_off + tx, new_score);
+      sum_off[tx] += new_score;
       *(ret_off + tx) = new_score;
       tx += stride_x;
     }

@@ -73,6 +73,12 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
+  // Create csr_t and coo
+  minigun::IntCsr csr_t;
+  csr_t = utils::ToReverseCsr(csr, kDLGPU);
+  minigun::IntCoo coo;
+  coo = utils::ToCoo(csr, kDLGPU);
+
   // Create stream
   minigun::advance::RuntimeConfig config;
   config.ctx = {kDLGPU, 0};
@@ -105,7 +111,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MaskedMMFunctor>(
-      config, csr, &gdata, infront);
+      config, csr, csr_t, coo, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 

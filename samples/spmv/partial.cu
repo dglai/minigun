@@ -60,6 +60,12 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
+  // Create csr_t and coo
+  minigun::IntCsr csr_t;
+  csr_t = utils::ToReverseCsr(csr, kDLGPU);
+  minigun::IntCoo coo;
+  coo = utils::ToCoo(csr, kDLGPU);
+
   // prepare frontiers
   minigun::IntArray infront, outfront;
   std::vector<int32_t> infront_vec;
@@ -105,7 +111,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<false, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLGPU, int32_t,  Config, GData, SPMVFunctor>(
-      config, csr, &gdata, infront, &outfront,
+      config, csr, csr_t, coo, &gdata, infront, &outfront,
       utils::GPUAllocator::Get());
 
   CUDA_CALL(cudaDeviceSynchronize());

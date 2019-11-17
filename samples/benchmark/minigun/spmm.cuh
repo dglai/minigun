@@ -30,7 +30,7 @@ struct SPMMFunctor {
     float* eidoff = gdata->weight + eid;
     float* outoff = gdata->out + dst * D;
     while (tx < D) {
-      atomicAdd(outoff + tx, __ldg(srcoff + tx) * __ldg(eidoff));
+      outoff[tx] += __ldg(srcoff + tx) * __ldg(eidoff);
       tx += stride_x;
     }
   }
