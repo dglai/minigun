@@ -112,6 +112,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     Idx end = _ldg(csr_t.row_offsets.data + dst + 1);
     for (Idx eid = start; eid < end; ++eid) {
       Idx src = _ldg(csr_t.column_indices.data + eid);
+      LOG(INFO) << "src: " << src << "dst: " << dst << "eid: " << eid << "\n";
       if (Functor::CondEdge(src, dst, eid, &gdata)) {
         Functor::ApplyEdge(src, dst, eid, &gdata);
       }
@@ -139,8 +140,6 @@ void CudaAdvanceAllNodeParallel(
   const int by = std::min((N + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-    << nthrs.x << "," << nthrs.y << ")";
   CudaAdvanceAllNodeParallelKernel<Idx, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata);
 }
