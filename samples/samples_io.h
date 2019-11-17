@@ -194,9 +194,9 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType dev
     const int32_t n_e = mg_csr.column_indices.length;
     int32_t* row_offsets = new int32_t[n_v + 1];
     int32_t* column_indices = new int32_t[n_e];
-    CUDA_CALL(cudaMemcpy(row_offsets, csr.row_offsets.data, (n_v + 1) * sizeof(int32_t),
+    CUDA_CALL(cudaMemcpy(row_offsets, mg_csr.row_offsets.data, (n_v + 1) * sizeof(int32_t),
         cudaMemcpyDeviceToHost));
-    CUDA_CALL(cudaMemcpy(column_indices, csr.column_indices.data, n_e * sizeof(int32_t),
+    CUDA_CALL(cudaMemcpy(column_indices, mg_csr.column_indices.data, n_e * sizeof(int32_t),
         cudaMemcpyDeviceToHost));
     std::copy(row_offsets, row_offsets + n_v + 1, csr.row_offsets.begin());
     std::copy(column_indices, column_indices + n_e, csr.column_indices.begin());
