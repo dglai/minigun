@@ -133,14 +133,14 @@ void CudaAdvanceAllNodeParallel(
     Alloc* alloc) {
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
-  const Idx M = csr.column_indices.length;
+  const Idx N = csr.row_offsets.length - 1;
   const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
-  const int by = std::min((M + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
+  const int by = std::min((N + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-    //<< nthrs.x << "," << nthrs.y << ")";
+  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+    << nthrs.x << "," << nthrs.y << ")";
   CudaAdvanceAllNodeParallelKernel<Idx, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata);
 }
