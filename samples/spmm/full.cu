@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
   config.ctx = {kDLGPU, 0};
   int nt = utils::_FindNumThreads(D, 32);
   config.data_num_threads = nt;
-  config.data_num_blocks = (M + nt - 1) / nt;
+  config.data_num_blocks = 1;
   CUDA_CALL(cudaStreamCreate(&config.stream));
 
   // Create feature data
