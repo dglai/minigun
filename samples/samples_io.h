@@ -4,6 +4,7 @@
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
 #include "./samples_utils.h"
+#include <iostream>
 
 namespace utils {
 
@@ -209,6 +210,12 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType dev
 
 minigun::IntCsr ToReverseCsr(const minigun::IntCsr& mg_csr, DLDeviceType device) {
   SampleCsr scsr = ToSampleCsr(mg_csr, device);
+  for (int i = 0; i < scsr.row_offsets.size(); ++i)
+    std::cout << scsr.row_offsets[i] << " ";
+  std::cout << std::endl << std::endl;
+  for (int i = 0; i < scsr.column_indices.size(); ++i)
+    std::cout << scsr.column_indices[i] << " ";
+  std::cout << std::endl;
   return ToMinigunReverseCsr(scsr, device);
 }
 
