@@ -3,6 +3,7 @@
 
 #include "./cuda_common.cuh"
 #include <algorithm>
+#include <cstdio>
 
 namespace minigun {
 namespace advance {
@@ -112,7 +113,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     Idx end = _ldg(csr_t.row_offsets.data + dst + 1);
     for (Idx eid = start; eid < end; ++eid) {
       Idx src = _ldg(csr_t.column_indices.data + eid);
-      LOG(INFO) << "src: " << src << "dst: " << dst << "eid: " << eid << "\n";
+      printf("src: %d dst: %d eid: %d", src, dst, eid);
       if (Functor::CondEdge(src, dst, eid, &gdata)) {
         Functor::ApplyEdge(src, dst, eid, &gdata);
       }
