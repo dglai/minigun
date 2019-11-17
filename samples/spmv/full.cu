@@ -22,7 +22,7 @@ struct SPMVFunctor {
   static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     //atomicAdd(gdata->next + dst, gdata->cur[src] * gdata->weight[eid]);
-    gdata->next[dst] = gdata->cur[src] * gdata->weight[eid];
+    gdata->next[dst] += gdata->cur[src] * gdata->weight[eid];
   }
 };
 
