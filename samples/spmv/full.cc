@@ -55,6 +55,12 @@ int main(int argc, char** argv) {
   csr.column_indices.length = column_indices.size();
   csr.column_indices.data = &column_indices[0];
 
+  // Create csr_t and coo
+  minigun::IntCsr csr_t;
+  csr_t = utils::ToReverseCsr(csr, kDLCPU);
+  minigun::IntCoo coo;
+  coo = utils::ToCoo(csr, kDLCPU);
+
   // Create Runtime Config, not used for cpu
   minigun::advance::RuntimeConfig config;
   config.ctx = {kDLCPU, 0};
@@ -81,7 +87,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
-      config, csr, &gdata, infront, nullptr,
+      config, csr, csr_t, coo, &gdata, infront, nullptr,
       utils::CPUAllocator::Get());
 
   // verify output
@@ -90,14 +96,14 @@ int main(int argc, char** argv) {
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
-        config, csr, &gdata, infront, nullptr,
+        config, csr, csr_t, coo, &gdata, infront, nullptr,
         utils::CPUAllocator::Get());
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
-        config, csr, &gdata, infront, nullptr,
+        config, csr, csr_t, coo, &gdata, infront, nullptr,
         utils::CPUAllocator::Get());
   }
   auto end = std::chrono::system_clock::now();

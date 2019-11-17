@@ -111,6 +111,7 @@ int main(int argc, char** argv) {
   csr.column_indices.length = column_indices.size();
   csr.column_indices.data = &column_indices[0];
 
+  // Create csr_t and coo
   minigun::IntCsr csr_t;
   csr_t = utils::ToReverseCsr(csr, kDLCPU);
   minigun::IntCoo coo;
