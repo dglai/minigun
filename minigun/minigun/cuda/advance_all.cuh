@@ -48,10 +48,12 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     //   when the thread is processing the neighbor list of a new node.
     Idx src = _ldg(coo.row.data + eid);
     Idx dst = _ldg(coo.column.data + eid);
+    /* TODO(zihao): what is this?
     if (src + dst < 0) {
       // garbage code that cannot be optimized out but will never be executed
       gdata.out[0] = -1;
     }
+    */
     if (Functor::CondEdge(src, dst, eid, &gdata)) {
       Functor::ApplyEdge(src, dst, eid, &gdata);
       // Add dst/eid to output frontier
