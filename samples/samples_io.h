@@ -179,24 +179,41 @@ minigun::IntCsr ToMinigunReverseCsr(const SampleCsr& sample_csr, DLDeviceType de
 }
 
 // create a sample csr that COPIES the memory of the minigun csr
-__inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr) {
+__inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType device) {
   SampleCsr csr;
   csr.row_offsets.resize(mg_csr.row_offsets.length);
-  std::copy(mg_csr.row_offsets.data, mg_csr.row_offsets.data + mg_csr.row_offsets.length,
-            csr.row_offsets.begin());
   csr.column_indices.resize(mg_csr.column_indices.length);
-  std::copy(mg_csr.column_indices.data, mg_csr.column_indices.data + mg_csr.column_indices.length,
-            csr.column_indices.begin());
+  if (device == kDLCPU) {
+    std::copy(mg_csr.row_offsets.data, mg_csr.row_offsets.data + mg_csr.row_offsets.length,
+              csr.row_offsets.begin());
+    std::copy(mg_csr.column_indices.data, mg_csr.column_indices.data + mg_csr.column_indices.length,
+              csr.column_indices.begin());
+  } else if (device == kDLGPU) {
+#ifdef __CUDACC__
+    const int32_t n_v = mg_csr.row_offsets.length - 1;
+    const int32_t n_e = mg_csr.column_indices.length;
+    int32_t* row_offsets = new int32_t[nv + 1];
+    int32_t* column_indices = new int32_t[ne];
+    CUDA_CALL(cudaMemcpy(row_offsets, csr.row_offsets.data, (nv + 1) * sizeof(int32_t),
+        cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaMemcpy(column_indices, csr.column_indices.data, ne * sizeof(int32_t),
+        cudaMemcpyDeviceToHost));
+    std::copy(row_offsets, row_offsets + nv + 1, csr.row_offsets.begin());
+    std::copy(column_indices, column_indices + ne, csr.column_indices.begin());
+#endif  // __CUDACC__
+  } else {
+    LOG(INFO) << "Unsupported device: " << device;
+  }
   return csr;
 }
 
 minigun::IntCsr ToReverseCsr(const minigun::IntCsr& mg_csr, DLDeviceType device) {
-  SampleCsr scsr = ToSampleCsr(mg_csr);
+  SampleCsr scsr = ToSampleCsr(mg_csr, device);
   return ToMinigunReverseCsr(scsr, device);
 }
 
 minigun::IntCoo ToCoo(const minigun::IntCsr& mg_csr, DLDeviceType device) {
-  SampleCsr scsr = ToSampleCsr(mg_csr);
+  SampleCsr scsr = ToSampleCsr(mg_csr, device);
   return ToMinigunCoo(scsr, device);
 }
 
