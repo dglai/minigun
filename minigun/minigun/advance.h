@@ -133,7 +133,7 @@ void Advance(const RuntimeConfig& config,
 #ifdef __CUDACC__
 #include "./cuda/advance.cuh"
 #else
-//#include "./cpu/advance.h"
+#include "./cpu/advance.h"
 #endif
 
 #endif  // MINIGUN_ADVANCE_H_

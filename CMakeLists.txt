@@ -16,8 +16,8 @@ else()
   endif()
 endif()
 
-minigun_option(USE_CUDA "Build with CUDA" ON)
-minigun_option(BUILD_SAMPLES "Build minigun samples" OFF)
+minigun_option(USE_CUDA "Build with CUDA" OFF)
+minigun_option(BUILD_SAMPLES "Build minigun samples" ON)
 minigun_option(ENABLE_PARTIAL_FRONTIER "Enable build with partial frontier support" ON)
 
 # include directories
