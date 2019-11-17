@@ -44,8 +44,7 @@ struct EdgeMax {
     while (tx < dim) {
       gdata->max[dst * dim + tx] = max(
           gdata->max[dst * dim + dst * dim + tx],
-          gdata->score[eid * dim + tx];
-          );
+          gdata->score[eid * dim + tx]);
       tx += stride_x;
     }
   }
