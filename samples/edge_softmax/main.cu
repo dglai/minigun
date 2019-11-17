@@ -7,6 +7,7 @@
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
+#include "../samples_io.h"
 
 struct GData {
   int32_t dim = 0;

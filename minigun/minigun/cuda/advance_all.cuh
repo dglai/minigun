@@ -141,7 +141,7 @@ void CudaAdvanceAllNodeParallel(
   const dim3 nthrs(rtcfg.data_num_threads, ty);
   //LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
     //<< nthrs.x << "," << nthrs.y << ")";
-  CudaAdvanceAllGunrockNodeParallelKernel<Idx, Config, GData, Functor>
+  CudaAdvanceAllNodeParallelKernel<Idx, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata);
 }
 
