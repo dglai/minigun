@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMVFunctor>(
-        config, csr, &gdata, infront, nullptr,
+        config, csr, csr_t, coo, &gdata, infront, nullptr,
         utils::GPUAllocator::Get());
   }
   CUDA_CALL(cudaDeviceSynchronize());
