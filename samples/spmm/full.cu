@@ -25,12 +25,12 @@ struct SPMMFunctor {
     int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t stride_x = blockDim.x * gridDim.x;
     while (tx < gdata->dim) {
-      gdata->next[dst * gdata->dim + tx] +=
-          gdata->cur[src * gdata->dim + tx] * gdata->weight[eid];
-      /*
+      //gdata->next[dst * gdata->dim + tx] +=
+      //    gdata->cur[src * gdata->dim + tx] * gdata->weight[eid];
+
       atomicAdd(gdata->next + dst * gdata->dim + tx,
                 gdata->cur[src * gdata->dim + tx] * gdata->weight[eid]);
-      */
+
       tx += stride_x;
     }
   }
