@@ -87,6 +87,7 @@ __inline__ minigun::IntCoo ToMinigunCoo(const SampleCsr& sample_csr, DLDeviceTyp
   }
   return coo;
 }
+
 // create a minigun Csr that copies the given sample csr memory
 __inline__ minigun::IntCsr ToMinigunCsr(const SampleCsr& sample_csr, DLDeviceType device) {
   minigun::IntCsr csr;
@@ -141,13 +142,13 @@ std::vector<int32_t*> transpose(const SampleCsr& sample_csr, int32_t* old_mappin
   for (size_t u = 0; u < n_v; ++u) {
     for (int32_t eid = sample_csr.row_offsets[u]; eid < sample_csr.row_offsets[u + 1]; ++eid) {
       int32_t v = sample_csr.column_indices[eid];
-      col[row[v]++] = u;
       new_mapping_data[row[v]] = old_mapping_data[eid];
+      col[row[v]++] = u;
     }
   }
   // reset row pointer
   for (size_t u = n_v - 1; u > 0; --u) {
-    row[u] = row[u-1];
+    row[u] = row[u - 1];
   }
   row[0] = 0;
   return {row, col, new_mapping_data};
@@ -173,16 +174,10 @@ std::pair<minigun::IntCsr, minigun::IntArray> ToMinigunReverseCsr(const SampleCs
   } else {
     LOG(INFO) << "Unsupported device: " << device;
   }
-
   auto csr_t = transpose(sample_csr, old_mapping_cpu);
   int32_t* row = csr_t[0];
   int32_t* col = csr_t[1];
   int32_t* new_mapping_cpu = csr_t[2];
-
-  for (int i = 0; i < n_e; ++i) {
-    std::cout << new_mapping_cpu[i] << " ";
-  }
-  std::cout << std::endl;
 
   if (device == kDLCPU) {
     csr.row_offsets.length = n_v + 1;
