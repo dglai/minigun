@@ -37,7 +37,8 @@ struct SPMMFunctor {
   }
 };
 
-void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
+void InitGData(const utils::SampleCsr& csr, const::minigun::IntArray eid_mapping,
+    GData* gdata, GData* truth) {
   const int32_t N = csr.row_offsets.size() - 1;
   const int32_t M = csr.column_indices.size();
   const int D = gdata->D;
@@ -58,6 +59,7 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   CUDA_CALL(cudaMalloc(&(gdata->weight), sizeof(float) * weight.size()));
   CUDA_CALL(cudaMemcpy(gdata->weight, &weight[0],
         sizeof(float) * weight.size(), cudaMemcpyHostToDevice));
+  gdata->eid_mapping = eid_mapping.data;
   // compute truth
   truth->out = new float[N * D];
   std::fill(truth->out, truth->out + N * D, 0.);

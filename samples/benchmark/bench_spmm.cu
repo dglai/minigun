@@ -15,6 +15,8 @@ using minigun::advance::RuntimeConfig;
 using namespace spmm;
 
 double RunMinigun(const utils::SampleCsr& scsr,
+                  const minigun::IntCsr& csr,
+                  const minigun::IntCsr& csr_t,
                   const minigun::IntCoo& coo,
                   int32_t feat_size,
                   GData& gdata,
@@ -35,9 +37,9 @@ double RunMinigun(const utils::SampleCsr& scsr,
   ResetGData(&gdata, scsr.row_offsets.size() - 1);
 
   // check accuracy
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
-      rtcfg, coo, &gdata, infront);
+      rtcfg, csr, csr_t, coo, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -45,19 +47,18 @@ double RunMinigun(const utils::SampleCsr& scsr,
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
-        rtcfg, coo, &gdata, infront);
+        rtcfg, csr, csr_t, coo, &gdata, infront);
   }
 
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
-        rtcfg, coo, &gdata, infront);
+        rtcfg, csr, csr_t, coo, &gdata, infront);
   }
   cudaEventRecord(stop);
   CUDA_CALL(cudaEventSynchronize(stop));
   float dur = 0;
   cudaEventElapsedTime(&dur, start, stop);
-
 
   return dur / K;
 }
@@ -248,23 +249,26 @@ int main(int argc, char** argv) {
   const int32_t M = scsr.column_indices.size();
   //std::cout << "#Nodes: " << N << " #Edges: " << M << std::endl;
 
+  // csr
+  minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
+  minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
+  auto csr_mapping = utils::arange(0, M, kDLGPU);
+  auto pack = utils::ToMinigunReverseCsr(scsr, kDLGPU);
+  minigun::IntCsr csr_t = pack.first;
+  minigun::IntArray csr_t_mapping = pack.second;
+
   // gdata
   GData gdata, truth;
   gdata.D = feat_size;
-  InitGData(scsr, &gdata, &truth);
+  InitGData(scsr, csr_t_mapping, &gdata, &truth);
   CUDA_CALL(cudaDeviceSynchronize());
 
-  // csr
-  //minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
-  minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
-  minigun::IntCsr rcsr = utils::ToMinigunReverseCsr(scsr, kDLGPU);
-
   //double dur1 = 0;
-  double dur1 = RunBaseline1(scsr, rcsr, feat_size, gdata, truth);
+  double dur1 = RunBaseline1(scsr, csr_t, feat_size, gdata, truth);
   //double dur2 = 0;
-  double dur2 = RunBaseline2(scsr, rcsr, feat_size, gdata, truth);
+  double dur2 = RunBaseline2(scsr, csr_t, feat_size, gdata, truth);
   //double dur3 = 0;
-  double dur3 = RunMinigun(scsr, coo, feat_size, gdata, truth);
+  double dur3 = RunMinigun(scsr, csr, csr_t, coo, feat_size, gdata, truth);
   std::cout << N << "," << M << "," << feat_size << "," << dur1 << "," << dur2 << "," << dur3 << "\n";
   FreeGData(&gdata, &truth);
   cudaDeviceReset();
