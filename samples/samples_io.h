@@ -169,7 +169,7 @@ std::pair<minigun::IntCsr, minigun::IntArray> ToMinigunReverseCsr(const SampleCs
     old_mapping_cpu = new int32_t[n_e];
     CUDA_CALL(cudaMemcpy(old_mapping_cpu, &old_mapping.data[0],
         sizeof(int32_t) * n_e, cudaMemcpyDeviceToHost));
-#endif  // __CUDAC__
+#endif  // __CUDACC__
   } else {
     LOG(INFO) << "Unsupported device: " << device;
   }
