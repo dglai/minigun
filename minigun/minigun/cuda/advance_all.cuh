@@ -177,17 +177,14 @@ void CudaAdvanceAll(
     case kGunrockLBOut :
       switch (Config::kParallel) {
         case kSrc:
-          LOG(INFO) << "parallel by src" << "\n";
           CudaAdvanceAllNodeParallel<Idx, Config, GData, Functor, Alloc>(
               rtcfg, csr, gdata, outbuf, alloc);
           break;
         case kEdge:
-          LOG(INFO) << "parallel by edge" << "\n";
           CudaAdvanceAllGunrockLBOut<Idx, Config, GData, Functor, Alloc>(
               rtcfg, coo, gdata, outbuf, alloc);
           break;
         case kDst:
-          LOG(INFO) << "parallel by dst" << "\n";
           CudaAdvanceAllNodeParallel<Idx, Config, GData, Functor, Alloc>(
               rtcfg, csr_t, gdata, outbuf, alloc);
           break;
