@@ -75,6 +75,7 @@ double RunBaseline1(const utils::SampleCsr& scsr,
   GData gdata, truth;
   gdata.H = num_heads;
   InitGData(scsr, eid_mapping, &gdata, &truth);
+  CUDA_CALL(cudaDeviceSynchronize());
  
   const int32_t N = csr.row_offsets.length - 1;
   const int H = gdata.H;
