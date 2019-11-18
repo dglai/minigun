@@ -158,7 +158,7 @@ std::pair<minigun::IntCsr, minigun::IntArray> ToMinigunReverseCsr(const SampleCs
   minigun::IntArray new_mapping;
   const size_t n_v = sample_csr.row_offsets.size() - 1;
   const size_t n_e = sample_csr.column_indices.size();
-  int32_t* old_mapping_cpu=nullptr;
+  int32_t* old_mapping_cpu = nullptr;
   if (old_mapping.length != n_e) {
     LOG(INFO) << "The length of mapping: does not equal number of edges in csr matrix";
   }
@@ -173,6 +173,10 @@ std::pair<minigun::IntCsr, minigun::IntArray> ToMinigunReverseCsr(const SampleCs
   } else {
     LOG(INFO) << "Unsupported device: " << device;
   }
+
+  for (int i = 0; i < n_e; ++i)
+    std::cout << old_mapping_cpu[i] << " ";
+  std::cout << std::endl;
 
   auto csr_t = transpose(sample_csr, old_mapping_cpu);
   int32_t* row = csr_t[0];
@@ -196,9 +200,8 @@ std::pair<minigun::IntCsr, minigun::IntArray> ToMinigunReverseCsr(const SampleCs
     CUDA_CALL(cudaMalloc(&csr.column_indices.data, n_e* sizeof(int32_t)));
     CUDA_CALL(cudaMemcpy(csr.column_indices.data, &col[0],
           sizeof(int32_t) * n_e, cudaMemcpyHostToDevice));
-
     new_mapping.length = n_e;
-    CUDA_CALL(cudaMalloc(&new_mapping.data, n_e*sizeof(int32_t)));
+    CUDA_CALL(cudaMalloc(&new_mapping.data, n_e * sizeof(int32_t)));
     CUDA_CALL(cudaMemcpy(new_mapping.data, &new_mapping_cpu[0],
           sizeof(int32_t) * n_e, cudaMemcpyHostToDevice));
 #endif  // __CUDACC__
