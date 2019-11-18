@@ -112,13 +112,13 @@ int main(int argc, char** argv) {
   csr.column_indices.data = &column_indices[0];
 
   // Create raw eid_mapping
-  minigun::IntArray1D csr_mapping = utils::arange(0, N, kDLCPU);
+  minigun::IntArray csr_mapping = utils::arange(0, N, kDLCPU);
 
   // Create csr_t and coo
   minigun::IntCsr csr_t;
   auto rev = utils::ToReverseCsr(csr, csr_mapping, kDLCPU);
   csr_t = rev.first;
-  minigun::IntArray1D csr_t_mapping = rev.second;
+  minigun::IntArray csr_t_mapping = rev.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLCPU);
 

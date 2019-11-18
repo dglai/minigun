@@ -153,9 +153,9 @@ std::vector<int32_t*> transpose(const SampleCsr& sample_csr, int32_t* old_mappin
   return {row, col, new_mapping_data};
 }
 
-std::pair<minigun::IntCsr, minigun::IntArray1D> ToMinigunReverseCsr(const SampleCsr& sample_csr, const minigun::IntArray1D& old_mapping, DLDeviceType device) {
+std::pair<minigun::IntCsr, minigun::IntArray> ToMinigunReverseCsr(const SampleCsr& sample_csr, const minigun::IntArray& old_mapping, DLDeviceType device) {
   minigun::IntCsr csr;
-  minigun::IntArray1D new_mapping;
+  minigun::IntArray new_mapping;
   const size_t n_v = sample_csr.row_offsets.size() - 1;
   const size_t n_e = sample_csr.column_indices.size();
   int32_t* old_mapping_cpu;
@@ -176,7 +176,7 @@ std::pair<minigun::IntCsr, minigun::IntArray1D> ToMinigunReverseCsr(const Sample
   int32_t* row = csr_t[0];
   int32_t* col = csr_t[1];
   int32_t* new_mapping_cpu = csr_t[2];
-  minigun::IntArray1D new_mapping;
+  minigun::IntArray new_mapping;
 
   if (device == kDLCPU) {
     csr.row_offsets.length = n_v + 1;
@@ -238,7 +238,7 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType dev
 
 std::pair<minigun::IntCsr, int32_t*> ToReverseCsr(
     const minigun::IntCsr& mg_csr,
-    const minigun::IntArray1D old_mapping,
+    const minigun::IntArray old_mapping,
     DLDeviceType device) {
   SampleCsr scsr = ToSampleCsr(mg_csr, device);
   return ToMinigunReverseCsr(scsr, old_mapping, device);
@@ -249,11 +249,11 @@ minigun::IntCoo ToCoo(const minigun::IntCsr& mg_csr, DLDeviceType device) {
   return ToMinigunCoo(scsr, device);
 }
 
-minigun::IntArray1D arange(int32_t low, int32_t high, DLDeviceType device) {
+minigun::IntArray arange(int32_t low, int32_t high, DLDeviceType device) {
   if (low >= high) {
     LOG(INFO) << "low should not be greater than or equal to high";
   }
-  minigun::IntArray1D rst;
+  minigun::IntArray rst;
   int32_t length = high - low;
   int32_t *rst_data = new int32_t[length];
   for (int32_t i = 0; i < length; ++i) {

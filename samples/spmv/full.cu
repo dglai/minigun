@@ -63,13 +63,13 @@ int main(int argc, char** argv) {
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
   // Create raw eid_mapping
-  minigun::IntArray1D csr_mapping = utils::arange(0, N, kDLGPU);
+  minigun::IntArray csr_mapping = utils::arange(0, N, kDLGPU);
 
   // Create csr_t and coo
   minigun::IntCsr csr_t;
   auto rev = utils::ToReverseCsr(csr, csr_mapping, kDLGPU);
   csr_t = rev.first;
-  minigun::IntArray1D csr_t_mapping = rev.second;
+  minigun::IntArray csr_t_mapping = rev.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLGPU);
 
