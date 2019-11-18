@@ -63,9 +63,10 @@ struct MinuxMaxExpSum {
     int32_t stride_x = blockDim.x * gridDim.x;
     const int32_t dim = gdata->dim;
     while (tx < dim) {
-      gdata->score[eid * dim + tx] = expf(
-          gdata->score[eid * dim + tx] - gdata->max[dst * dim + tx]);
-      gdata->sum[dst * dim + tx] += gdata->score[eid * dim + tx];
+      gdata->score[gdata->eid_mapping[eid] * dim + tx] =
+          expf(gdata->score[gdata->eid_mapping[eid] * dim + tx] - gdata->max[dst * dim + tx]);
+      gdata->sum[dst * dim + tx] +=
+          gdata->score[gdata->eid_mapping[eid] * dim + tx];
       tx += stride_x;
     }
   }
@@ -187,10 +188,10 @@ int main(int argc, char** argv) {
   //utils::VecPrint(truth);
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> ConfigDst;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> ConfigEdge;
   minigun::advance::Advance<kDLGPU, int32_t, ConfigDst, GData, EdgeMax>(
       config, csr, csr_t, coo, &gdata, infront);
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> ConfigEdge;
-  minigun::advance::Advance<kDLGPU, int32_t, ConfigEdge, GData, MinuxMaxExpSum>(
+  minigun::advance::Advance<kDLGPU, int32_t, ConfigDst, GData, MinuxMaxExpSum>(
       config, csr, csr_t, coo, &gdata, infront);
   minigun::advance::Advance<kDLGPU, int32_t, ConfigEdge, GData, Norm>(
       config, csr, csr_t, coo, &gdata, infront);
