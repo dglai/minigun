@@ -13,7 +13,7 @@ struct GData {
   float* ndata{nullptr};  // N*D
   float* weight{nullptr}; // M
   float* out{nullptr};    // N*D
-  float* eid_mapping{nullptr};
+  int* eid_mapping{nullptr};
 };
 
 struct SPMMFunctor {

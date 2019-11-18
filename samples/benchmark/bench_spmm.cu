@@ -253,7 +253,7 @@ int main(int argc, char** argv) {
   minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
   minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
   auto csr_mapping = utils::arange(0, M, kDLGPU);
-  auto pack = utils::ToMinigunReverseCsr(scsr, kDLGPU);
+  auto pack = utils::ToMinigunReverseCsr(scsr, csr_mapping, kDLGPU);
   minigun::IntCsr csr_t = pack.first;
   minigun::IntArray csr_t_mapping = pack.second;
 
