@@ -23,7 +23,7 @@ struct SPMVFunctor {
   static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     //atomicAdd(gdata->next + dst, gdata->cur[src] * gdata->weight[eid]);
-    gdata->next[dst] += gdata->cur[src] * gdata->weight[eid];
+    gdata->next[dst] += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
   }
 };
 
@@ -96,6 +96,7 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemset(gdata.next, 0, sizeof(float) * N));
   CUDA_CALL(cudaMalloc(&gdata.weight, sizeof(float) * M));
   CUDA_CALL(cudaMemcpy(gdata.weight, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
+  gdata.eid_mapping = csr_t_mapping.data;
 
   CUDA_CALL(cudaDeviceSynchronize());
 

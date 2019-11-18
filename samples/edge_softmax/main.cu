@@ -45,7 +45,7 @@ struct EdgeMax {
     while (tx < dim) {
       gdata->max[dst * dim + tx] = max(
           gdata->max[dst * dim + dst * dim + tx],
-          gdata->score[eid * dim + tx]);
+          gdata->score[gdata->eid_mapping[eid] * dim + tx]);
       tx += stride_x;
     }
   }
@@ -178,6 +178,7 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemcpy(gdata.max, &vvec[0], sizeof(float) * N * D, cudaMemcpyHostToDevice));
   CUDA_CALL(cudaMalloc(&gdata.score, sizeof(float) * M * D));
   CUDA_CALL(cudaMemcpy(gdata.score, &evec[0], sizeof(float) * M * D, cudaMemcpyHostToDevice));
+  gdata.eid_mapping = csr_t_mapping.data;
 
   CUDA_CALL(cudaDeviceSynchronize());
 

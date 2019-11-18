@@ -12,7 +12,6 @@ struct GData {
   int32_t dim = 0;
   float* ndata{nullptr};
   float* edata{nullptr};
-  int* eid_mapping{nullptr};
 };
 
 struct MaskedMMFunctor {

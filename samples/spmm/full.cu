@@ -27,7 +27,7 @@ struct SPMMFunctor {
     int32_t stride_x = blockDim.x * gridDim.x;
     while (tx < gdata->dim) {
       gdata->next[dst * gdata->dim + tx] +=
-          gdata->cur[src * gdata->dim + tx] * gdata->weight[eid];
+          gdata->cur[src * gdata->dim + tx] * gdata->weight[gdata->eid_mapping[eid]];
       tx += stride_x;
     }
   }
@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemset(gdata.next, 0, sizeof(float) * N * D));
   CUDA_CALL(cudaMalloc(&gdata.weight, sizeof(float) * M));
   CUDA_CALL(cudaMemcpy(gdata.weight, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
+  gdata.eid_mapping = csr_t_mapping.data;
 
   CUDA_CALL(cudaDeviceSynchronize());
 
