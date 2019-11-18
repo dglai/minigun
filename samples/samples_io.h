@@ -118,13 +118,16 @@ __inline__ minigun::IntCsr ToMinigunCsr(const SampleCsr& sample_csr, DLDeviceTyp
   return csr;
 }
 
-std::vector<int32_t*> transpose(const SampleCsr& sample_csr) {
+std::vector<int32_t*> transpose(const SampleCsr& sample_csr, int32_t* old_mapping_data) {
+  // old_mapping_data is stored on CPU.
   const size_t n_v = sample_csr.row_offsets.size() - 1;
   const size_t n_e = sample_csr.column_indices.size();
   int32_t* row = new int32_t[n_v + 1];
   int32_t* col = new int32_t[n_e];
+  int32_t* new_mapping_data = new int32_t[n_e];
   memset(row, 0, (n_v + 1) * sizeof(int32_t));
   memset(col, 0, (n_e) * sizeof(int32_t));
+  memset(new_mapping_data, 0, (n_e) * sizeof(int32_t));
   // transpose
   // edge count
   for (size_t i = 0; i < n_e; ++i) {
@@ -139,6 +142,7 @@ std::vector<int32_t*> transpose(const SampleCsr& sample_csr) {
     for (int32_t eid = sample_csr.row_offsets[u]; eid < sample_csr.row_offsets[u + 1]; ++eid) {
       int32_t v = sample_csr.column_indices[eid];
       col[row[v]++] = u;
+      new_mapping_data[row[v]] = old_mapping_data[eid];
     }
   }
   // reset row pointer
@@ -146,22 +150,41 @@ std::vector<int32_t*> transpose(const SampleCsr& sample_csr) {
     row[u] = row[u-1];
   }
   row[0] = 0;
-  return {row, col};
+  return {row, col, new_mapping_data};
 }
 
-minigun::IntCsr ToMinigunReverseCsr(const SampleCsr& sample_csr, DLDeviceType device) {
+std::pair<minigun::IntCsr, minigun::IntArray1D> ToMinigunReverseCsr(const SampleCsr& sample_csr, const minigun::IntArray1D& old_mapping, DLDeviceType device) {
   minigun::IntCsr csr;
+  minigun::IntArray1D new_mapping;
   const size_t n_v = sample_csr.row_offsets.size() - 1;
   const size_t n_e = sample_csr.column_indices.size();
-  auto csr_t = transpose(sample_csr);
+  int32_t* old_mapping_cpu;
+  if (old_mapping.length != n_e) {
+    LOG(INFO) << "The length of mapping: does not equal number of edges in csr matrix";
+  }
+  if (device == kDLCPU) {
+    old_mapping_cpu = old_mapping.data;
+#ifdef __CUDACC__
+  } else if (device == kDLGPU) {
+    old_mapping_cpu = new int32_t[n_e];
+    CUDA_CALL(cudaMemcpy(old_mapping_cpu, &old_mapping.data[0],
+        int(int32_t) * n_e, cudaMemcpyDeviceToHost));
+#endif  // __CUDAC__
+  }
+
+  auto csr_t = transpose(sample_csr, old_mapping_cpu);
   int32_t* row = csr_t[0];
   int32_t* col = csr_t[1];
+  int32_t* new_mapping_cpu = csr_t[2];
+  minigun::IntArray1D new_mapping;
 
   if (device == kDLCPU) {
     csr.row_offsets.length = n_v + 1;
     csr.row_offsets.data = row;
     csr.column_indices.length = n_e;
     csr.column_indices.data = col;
+    new_mapping.length = n_e;
+    new_mapping.data = new_mapping_cpu;
 #ifdef __CUDACC__
   } else if (device == kDLGPU) {
     csr.row_offsets.length = n_v + 1;
@@ -172,11 +195,16 @@ minigun::IntCsr ToMinigunReverseCsr(const SampleCsr& sample_csr, DLDeviceType de
     CUDA_CALL(cudaMalloc(&csr.column_indices.data, n_e* sizeof(int32_t)));
     CUDA_CALL(cudaMemcpy(csr.column_indices.data, &col[0],
           sizeof(int32_t) * n_e, cudaMemcpyHostToDevice));
+
+    new_mapping.length = n_e;
+    CUDA_CALL(cudaMalloc(&new_mapping.data, n_e*sizeof(int32_t)));
+    CUDA_CALL(cudaMemcpy(new_mapping.data, &new_mapping_cpu[0],
+          sizeof(int32_t) * n_e, cudaMemcpyHostToDevice));
 #endif  // __CUDACC__
   } else {
     LOG(INFO) << "Unsupported device: " << device;
   }
-  return csr;
+  return {csr, new_mapping};
 }
 
 // create a sample csr that COPIES the memory of the minigun csr
@@ -195,10 +223,10 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType dev
     const int32_t n_e = mg_csr.column_indices.length;
     int32_t* row_offsets = new int32_t[n_v + 1];
     int32_t* column_indices = new int32_t[n_e];
-    CUDA_CALL(cudaMemcpy(row_offsets, mg_csr.row_offsets.data, (n_v + 1) * sizeof(int32_t),
-        cudaMemcpyDeviceToHost));
-    CUDA_CALL(cudaMemcpy(column_indices, mg_csr.column_indices.data, n_e * sizeof(int32_t),
-        cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaMemcpy(row_offsets, &mg_csr.row_offsets.data[0],
+        (n_v + 1) * sizeof(int32_t), cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaMemcpy(column_indices, &mg_csr.column_indices.data[0],
+        n_e * sizeof(int32_t), cudaMemcpyDeviceToHost));
     std::copy(row_offsets, row_offsets + n_v + 1, csr.row_offsets.begin());
     std::copy(column_indices, column_indices + n_e, csr.column_indices.begin());
 #endif  // __CUDACC__
@@ -208,20 +236,31 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType dev
   return csr;
 }
 
-minigun::IntCsr ToReverseCsr(const minigun::IntCsr& mg_csr, DLDeviceType device) {
+std::pair<minigun::IntCsr, int32_t*> ToReverseCsr(const minigun::IntCsr& mg_csr, const minigun::IntArray1D old_mapping, DLDeviceType device) {
   SampleCsr scsr = ToSampleCsr(mg_csr, device);
-  for (int i = 0; i < scsr.row_offsets.size(); ++i)
-    std::cout << scsr.row_offsets[i] << " ";
-  std::cout << std::endl << std::endl;
-  for (int i = 0; i < scsr.column_indices.size(); ++i)
-    std::cout << scsr.column_indices[i] << " ";
-  std::cout << std::endl;
-  return ToMinigunReverseCsr(scsr, device);
+  return ToMinigunReverseCsr(scsr, old_mapping, device);
 }
 
 minigun::IntCoo ToCoo(const minigun::IntCsr& mg_csr, DLDeviceType device) {
   SampleCsr scsr = ToSampleCsr(mg_csr, device);
   return ToMinigunCoo(scsr, device);
+}
+
+minigun::IntArray1D arange(int32_t low, int32_t high) {
+  if (low >= high) {
+    LOG(INFO) << "low should not be greater than or equal to high";
+  }
+  minigun::IntArray1D rst;
+  int32_t length = high - low;
+  int32_t rst_data = new int32_t[length];
+  for (int32_t i = 0; i < length; ++i) {
+    rst_data[i] = low + i;
+  }
+  rst.length = length;
+  CUDA_CALL(cudaMalloc(&rst.data, length * sizeof(int32_t)));
+  CUDA_CALL(cudaMemcpy(rst.data, &rst_data[0],
+      length * sizeof(int32_t), cudaMemcpyHostToDevice));
+  return rst;
 }
 
 }  // namespace utils
