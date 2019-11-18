@@ -176,7 +176,6 @@ std::pair<minigun::IntCsr, minigun::IntArray> ToMinigunReverseCsr(const SampleCs
   int32_t* row = csr_t[0];
   int32_t* col = csr_t[1];
   int32_t* new_mapping_cpu = csr_t[2];
-  minigun::IntArray new_mapping;
 
   if (device == kDLCPU) {
     csr.row_offsets.length = n_v + 1;
@@ -236,7 +235,7 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType dev
   return csr;
 }
 
-std::pair<minigun::IntCsr, int32_t*> ToReverseCsr(
+std::pair<minigun::IntCsr, minigun::IntArray> ToReverseCsr(
     const minigun::IntCsr& mg_csr,
     const minigun::IntArray old_mapping,
     DLDeviceType device) {
