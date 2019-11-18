@@ -69,11 +69,12 @@ double RunMinigun(const utils::SampleCsr& scsr,
 
 double RunBaseline1(const utils::SampleCsr& scsr,
                   const minigun::IntCsr& csr,
+                  const minigun::IntArray& eid_mapping,
                   int32_t feat_size, int32_t num_heads) {
   // gdata
   GData gdata, truth;
   gdata.H = num_heads;
-  InitGData(scsr, &gdata, &truth);
+  InitGData(scsr, eid_mapping, &gdata, &truth);
  
   const int32_t N = csr.row_offsets.length - 1;
   const int H = gdata.H;
@@ -132,7 +133,7 @@ int main(int argc, char** argv) {
 
   double dur1 = RunMinigun(scsr, csr, csr_t, coo, csr_t_mapping, 0, num_heads);
   std::cout << "minigun time(ms): " << dur1 << std::endl;
-  double dur2 = RunBaseline1(scsr, csr, 0, num_heads);
+  double dur2 = RunBaseline1(scsr, csr, csr_t_mapping, 0, num_heads);
   std::cout << "baseline1 time(ms): " << dur2 << std::endl;
 
   return 0;
