@@ -14,6 +14,7 @@ struct GData {
   float* sum{nullptr};  // ndata
   float* max{nullptr};  // ndata
   float* score{nullptr};
+  int* eid_mapping{nullptr};
 };
 
 /*
@@ -139,9 +140,14 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
+  // Create raw eid_mapping
+  minigun::IntArray1D csr_mapping = utils::arange(0, N, kDLGPU);
+
   // Create csr_t and coo
   minigun::IntCsr csr_t;
-  csr_t = utils::ToReverseCsr(csr, kDLGPU);
+  auto rev = utils::ToReverseCsr(csr, csr_mapping, kDLGPU);
+  csr_t = rev.first;
+  minigun::IntArray1D csr_t_mapping = rev.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLGPU);
 

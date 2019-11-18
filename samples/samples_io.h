@@ -217,8 +217,8 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType dev
               csr.row_offsets.begin());
     std::copy(mg_csr.column_indices.data, mg_csr.column_indices.data + mg_csr.column_indices.length,
               csr.column_indices.begin());
-  } else if (device == kDLGPU) {
 #ifdef __CUDACC__
+  } else if (device == kDLGPU) {
     const int32_t n_v = mg_csr.row_offsets.length - 1;
     const int32_t n_e = mg_csr.column_indices.length;
     int32_t* row_offsets = new int32_t[n_v + 1];
@@ -236,7 +236,10 @@ __inline__ SampleCsr ToSampleCsr(const minigun::IntCsr& mg_csr, DLDeviceType dev
   return csr;
 }
 
-std::pair<minigun::IntCsr, int32_t*> ToReverseCsr(const minigun::IntCsr& mg_csr, const minigun::IntArray1D old_mapping, DLDeviceType device) {
+std::pair<minigun::IntCsr, int32_t*> ToReverseCsr(
+    const minigun::IntCsr& mg_csr,
+    const minigun::IntArray1D old_mapping,
+    DLDeviceType device) {
   SampleCsr scsr = ToSampleCsr(mg_csr, device);
   return ToMinigunReverseCsr(scsr, old_mapping, device);
 }
@@ -246,20 +249,28 @@ minigun::IntCoo ToCoo(const minigun::IntCsr& mg_csr, DLDeviceType device) {
   return ToMinigunCoo(scsr, device);
 }
 
-minigun::IntArray1D arange(int32_t low, int32_t high) {
+minigun::IntArray1D arange(int32_t low, int32_t high, DLDeviceType device) {
   if (low >= high) {
     LOG(INFO) << "low should not be greater than or equal to high";
   }
   minigun::IntArray1D rst;
   int32_t length = high - low;
-  int32_t rst_data = new int32_t[length];
+  int32_t *rst_data = new int32_t[length];
   for (int32_t i = 0; i < length; ++i) {
     rst_data[i] = low + i;
   }
   rst.length = length;
-  CUDA_CALL(cudaMalloc(&rst.data, length * sizeof(int32_t)));
-  CUDA_CALL(cudaMemcpy(rst.data, &rst_data[0],
-      length * sizeof(int32_t), cudaMemcpyHostToDevice));
+  if (device == kDLCPU) {
+    rst.data = rst_data;
+#ifdef __CUDACC__
+  } else if (device == kDLGPU) {
+    CUDA_CALL(cudaMalloc(&rst.data, length * sizeof(int32_t)));
+    CUDA_CALL(cudaMemcpy(rst.data, &rst_data[0],
+        length * sizeof(int32_t), cudaMemcpyHostToDevice));
+#endif  // __CUDACC__
+  } else {
+    LOG(INFO) << "Unsupported device: " << device;
+  }
   return rst;
 }
 
