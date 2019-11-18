@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
 
   // Create raw eid_mapping
-  minigun::IntArray csr_mapping = utils::arange(0, N, kDLGPU);
+  minigun::IntArray csr_mapping = utils::arange(0, M, kDLGPU);
 
   // Create csr_t and coo
   minigun::IntCsr csr_t;

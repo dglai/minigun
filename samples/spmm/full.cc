@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
   csr.column_indices.data = &column_indices[0];
 
   // Create raw eid_mapping
-  minigun::IntArray csr_mapping = utils::arange(0, N, kDLCPU);
+  minigun::IntArray csr_mapping = utils::arange(0, M, kDLCPU);
 
   // Create csr_t and coo
   minigun::IntCsr csr_t;
