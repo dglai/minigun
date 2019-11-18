@@ -1,4 +1,4 @@
-#add_subdirectory(benchmark)
+add_subdirectory(benchmark)
 add_subdirectory(spmv)
 add_subdirectory(spmm)
 add_subdirectory(masked_mm)

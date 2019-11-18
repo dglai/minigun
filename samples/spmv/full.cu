@@ -67,9 +67,9 @@ int main(int argc, char** argv) {
 
   // Create csr_t and coo
   minigun::IntCsr csr_t;
-  auto rev = utils::ToReverseCsr(csr, csr_mapping, kDLGPU);
-  csr_t = rev.first;
-  minigun::IntArray csr_t_mapping = rev.second;
+  auto pack = utils::ToReverseCsr(csr, csr_mapping, kDLGPU);
+  csr_t = pack.first;
+  minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLGPU);
 

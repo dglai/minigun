@@ -100,7 +100,8 @@ struct NormByDst {
   }
 };
 
-void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
+void InitGData(const utils::SampleCsr& csr, const minigun::IntArray eid_mapping,
+    GData* gdata, GData* truth) {
   const int32_t N = csr.row_offsets.size() - 1;
   const int32_t M = csr.column_indices.size();
   const int H = gdata->H;
@@ -121,6 +122,7 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   CUDA_CALL(cudaMalloc(&(gdata->ret), sizeof(float) * M * gdata->H));
   CUDA_CALL(cudaMemcpy(gdata->ret, &ret[0],
         sizeof(float) * M * gdata->H, cudaMemcpyHostToDevice));
+  gdata->eid_mapping = eid_mapping.data;
   // compute truth
   truth->ret = new float[M * H];
   std::vector<float> tmp(N * H, 0.);
