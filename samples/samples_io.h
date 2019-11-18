@@ -174,14 +174,15 @@ std::pair<minigun::IntCsr, minigun::IntArray> ToMinigunReverseCsr(const SampleCs
     LOG(INFO) << "Unsupported device: " << device;
   }
 
-  for (int i = 0; i < n_e; ++i)
-    std::cout << old_mapping_cpu[i] << " ";
-  std::cout << std::endl;
-
   auto csr_t = transpose(sample_csr, old_mapping_cpu);
   int32_t* row = csr_t[0];
   int32_t* col = csr_t[1];
   int32_t* new_mapping_cpu = csr_t[2];
+
+  for (int i = 0; i < n_e; ++i) {
+    std::cout << new_mapping_cpu[i] << " ";
+  }
+  std::cout << std::endl;
 
   if (device == kDLCPU) {
     csr.row_offsets.length = n_v + 1;
