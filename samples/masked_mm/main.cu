@@ -28,7 +28,7 @@ struct MaskedMMFunctor {
       sum += gdata->ndata[src * dim + tx] * gdata->ndata[dst * dim + tx];
       tx += blockDim.x;
     }
-    atomicAdd(gdata->edata + eid, sum);
+    gdata->edata[eid] += sum;
   }
 };
 
@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
   // Create stream
   minigun::advance::RuntimeConfig config;
   config.ctx = {kDLGPU, 0};
-  config.data_num_threads = utils::_FindNumThreads(D, 32);
+  config.data_num_threads = 1;//utils::_FindNumThreads(D, 32);
   config.data_num_blocks = 1;
   CUDA_CALL(cudaStreamCreate(&config.stream));
 

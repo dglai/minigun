@@ -17,20 +17,6 @@ struct GData {
   int* eid_mapping{nullptr};
 };
 
-/*
-__device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
-  uint32_t* addr_as_ui = reinterpret_cast<uint32_t*>(addr);
-  uint32_t old = *addr_as_ui;
-  uint32_t assumed = old;
-  do {
-    assumed = old;
-    old = atomicCAS(addr_as_ui, assumed,
-        __float_as_uint(fmax(val, __uint_as_float(old))));
-  } while (assumed != old);
-  return __uint_as_float(old);
-}
-*/
-
 // Max
 struct EdgeMax {
   static __device__ __forceinline__ bool CondEdge(

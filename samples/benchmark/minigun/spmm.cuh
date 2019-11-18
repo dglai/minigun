@@ -13,6 +13,7 @@ struct GData {
   float* ndata{nullptr};  // N*D
   float* weight{nullptr}; // M
   float* out{nullptr};    // N*D
+  float* eid_mapping{nullptr};
 };
 
 struct SPMMFunctor {
@@ -27,7 +28,7 @@ struct SPMMFunctor {
     int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
     int32_t stride_x = blockDim.x * gridDim.x;
     float* srcoff = gdata->ndata + src * D;
-    float* eidoff = gdata->weight + eid;
+    float* eidoff = gdata->weight + gdata->eid_mapping[eid];
     float* outoff = gdata->out + dst * D;
     while (tx < D) {
       outoff[tx] += __ldg(srcoff + tx) * __ldg(eidoff);

@@ -13,21 +13,8 @@ struct GData {
   float* sum{nullptr};
   float* max{nullptr};
   float* ret{nullptr};
+  int* eid_mapping{nullptr};
 };
-
-/*
-__device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
-  uint32_t* addr_as_ui = reinterpret_cast<uint32_t*>(addr);
-  uint32_t old = *addr_as_ui;
-  uint32_t assumed = old;
-  do {
-    assumed = old;
-    old = atomicCAS(addr_as_ui, assumed,
-        __float_as_uint(fmax(val, __uint_as_float(old))));
-  } while (assumed != old);
-  return __uint_as_float(old);
-}
-*/
 
 // Max
 struct EdgeMax {
@@ -40,7 +27,7 @@ struct EdgeMax {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
     const int H = gdata->H;
-    float* inoff = gdata->score + eid * H;
+    float* inoff = gdata->score + gdata->eid_mapping[eid] * H;
     float* outoff = gdata->max + dst * H;
     while (tx < H) {
       *(outoff + tx) = max(*(outoff + tx) , __ldg(inoff + tx));
@@ -60,8 +47,8 @@ struct MinusMaxExpSum {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
     const int H = gdata->H;
-    const float* score_off = gdata->score + eid * H;
-    float* ret_off = gdata->ret + eid * H;
+    const float* score_off = gdata->score + gdata->eid_mapping[eid]* H;
+    float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* max_off = gdata->max + dst * H;
     float* sum_off = gdata->sum + dst * H;
     while (tx < H) {
@@ -73,8 +60,8 @@ struct MinusMaxExpSum {
   }
 };
 
-// norm
-struct Norm {
+// norm (edge parallel)
+struct NormByEdge {
   static __device__ __forceinline__ bool CondEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
@@ -85,6 +72,26 @@ struct Norm {
     int stride_x = blockDim.x * gridDim.x;
     const int H = gdata->H;
     float* ret_off = gdata->ret + eid * H;
+    float* sum_off = gdata->sum + dst * H;
+    while (tx < H) {
+      *(ret_off + tx) /= __ldg(sum_off + tx);
+      tx += stride_x;
+    }
+  }
+};
+
+// norm (node parallel by destinatino)
+struct NormByDst {
+   static __device__ __forceinline__ bool CondEdge(
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    return true;
+  }
+  static __device__ __forceinline__ void ApplyEdge(
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride_x = blockDim.x * gridDim.x;
+    const int H = gdata->H;
+    float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* sum_off = gdata->sum + dst * H;
     while (tx < H) {
       *(ret_off + tx) /= __ldg(sum_off + tx);

@@ -13,6 +13,7 @@ struct GData {
   float* grad_score{nullptr};
   float* accum{nullptr};
   float* out{nullptr};
+  int* eid_mapping{nullptr};
 };
 
 // backward softmax phase 0
@@ -29,9 +30,9 @@ struct BackSoftmaxAccum {
     int h = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_h = blockDim.x * gridDim.x;
     float* score_off = gdata->score + eid * H;
-    float* grad_score_off = gdata->grad_score + eid * H;
+    float* grad_score_off = gdata->grad_score + gdata->eid_mapping[eid] * H;
     float* accum_off = gdata->accum + dst * H;
-    float* ret_off = gdata->out + eid * H;
+    float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
     while (h < H) {
       float sds = __ldg(score_off + h) * __ldg(grad_score_off + h);
       accum_off[h] += sds;
@@ -53,9 +54,9 @@ struct BackSoftmaxMinus {
     // each thread handles one attention head
     int h = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_h = blockDim.x * gridDim.x;
-    float* score_off = gdata->score + eid * H;
+    float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
     float* accum_off = gdata->accum + dst * H;
-    float* ret_off = gdata->out + eid * H;
+    float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
     while (h < H) {
       *(ret_off + h) -= __ldg(score_off + h) * __ldg(accum_off + h);
       h += stride_h;
