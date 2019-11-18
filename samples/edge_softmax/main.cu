@@ -186,12 +186,13 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> ConfigDst;
+  minigun::advance::Advance<kDLGPU, int32_t, ConfigDst, GData, EdgeMax>(
       config, csr, csr_t, coo, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinuxMaxExpSum>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> ConfigEdge;
+  minigun::advance::Advance<kDLGPU, int32_t, ConfigEdge, GData, MinuxMaxExpSum>(
       config, csr, csr_t, coo, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, Norm>(
+  minigun::advance::Advance<kDLGPU, int32_t, ConfigEdge, GData, Norm>(
       config, csr, csr_t, coo, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());
