@@ -130,6 +130,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
         }
         if (outbuf != nullptr)
           outbuf[outoff] = val;
+        tx += stride_x;
       }
       dst += stride_y;
     }
@@ -151,6 +152,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
         }
         if (outbuf != nullptr)
           outbuf[outoff] = val;
+        tx += stride_x;
       }
       src += stride_y;
     }
