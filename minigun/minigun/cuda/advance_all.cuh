@@ -117,10 +117,10 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     while (dst < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + dst);
       Idx end = _ldg(csr.row_offsets.data + dst + 1);
-      while (tx < gdata->GetFeatSize()) {
-        Idx outoff = dst * gdata->GetFeatSize() + tx;
+      while (tx < gdata.GetFeatSize()) {
+        Idx outoff = dst * gdata.GetFeatSize() + tx;
         DType val = static_cast<DType>(0);
-        DType *outbuf = gdata->GetOutBuf<Functor>();
+        DType *outbuf = gdata.GetOutBuf<Functor>();
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
@@ -138,10 +138,10 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     while (src < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + src);
       Idx end = _ldg(csr.row_offsets.data + src + 1);
-      while (tx < gdata->GetFeatSize()) {
-        Idx outoff = src * gdata->GetFeatSize() + tx;
+      while (tx < gdata.GetFeatSize()) {
+        Idx outoff = src * gdata.GetFeatSize() + tx;
         DType val = static_cast<DType>(0);
-        DType *outbuf = gdata->GetOutBuf(Functor)();
+        DType *outbuf = gdata.GetOutBuf(Functor)();
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
