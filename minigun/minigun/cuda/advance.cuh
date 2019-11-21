@@ -19,7 +19,7 @@ template <typename Idx,
           typename GData,
           typename Functor,
           typename Alloc>
-struct DispatchXPU<kDLGPU, Idx, Config, GData, Functor, Alloc> {
+struct DispatchXPU<kDLGPU, Idx, DType, Config, GData, Functor, Alloc> {
   static void Advance(
       const RuntimeConfig& rtcfg,
       const Csr<Idx>& csr,
