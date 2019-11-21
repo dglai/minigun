@@ -40,7 +40,7 @@ template <typename Idx,
           typename Functor>
 __global__ void CudaAdvanceAllGunrockLBOutKernel(
     Coo<Idx> coo,
-    GData* gdata,
+    GData gdata,
     IntArray1D<Idx> output_frontier) {
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
   Idx stride_y = blockDim.y * gridDim.y;
@@ -54,8 +54,8 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
       gdata.out[0] = -1;
     }
     */
-    if (Functor::CondEdge(src, dst, eid, gdata)) {
-      Functor::ApplyEdge(src, dst, eid, gdata);
+    if (Functor::CondEdge(src, dst, eid, &gdata)) {
+      Functor::ApplyEdge(src, dst, eid, &gdata);
       // Add dst/eid to output frontier
       if (Config::kMode == kV2V || Config::kMode == kE2V) {
         output_frontier.data[eid] = dst;
@@ -97,7 +97,7 @@ void CudaAdvanceAllGunrockLBOut(
     << nthrs.x << "," << nthrs.y << ")";
   */
   CudaAdvanceAllGunrockLBOutKernel<Idx, DType, Config, GData, Functor>
-    <<<nblks, nthrs, 0, rtcfg.stream>>>(coo, gdata, output_frontier);
+    <<<nblks, nthrs, 0, rtcfg.stream>>>(coo, *gdata, output_frontier);
 }
 
 template <typename Idx,
@@ -107,7 +107,7 @@ template <typename Idx,
           typename Functor>
 __global__ void CudaAdvanceAllNodeParallelKernel(
     Csr<Idx> csr,
-    GData* gdata) {
+    GData gdata) {
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
   Idx tx = blockIdx.x * blockDim.x + threadIdx.x;
   Idx stride_y = blockDim.y * gridDim.y;
@@ -117,16 +117,16 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     while (dst < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + dst);
       Idx end = _ldg(csr.row_offsets.data + dst + 1);
-      while (tx < Functor::GetFeatSize(gdata)) {
-        Idx outoff = dst * Functor::GetFeatSize(gdata) + tx;
+      while (tx < Functor::GetFeatSize(&gdata)) {
+        Idx outoff = dst * Functor::GetFeatSize(&gdata) + tx;
         DType val = static_cast<DType>(0);
-        DType *outbuf = Functor::GetOutBuf(gdata);
+        DType *outbuf = Functor::GetOutBuf(&gdata);
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
           Idx src = _ldg(csr.column_indices.data + eid);
-          if (Functor::CondEdge(src, dst, eid, gdata))
-            Functor::ApplyEdgeReduce(src, dst, eid, tx, val, gdata);
+          if (Functor::CondEdge(src, dst, eid, &gdata))
+            Functor::ApplyEdgeReduce(src, dst, eid, tx, val, &gdata);
         }
         if (outbuf != nullptr)
           outbuf[outoff] = val;
@@ -138,16 +138,16 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     while (src < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + src);
       Idx end = _ldg(csr.row_offsets.data + src + 1);
-      while (tx < Functor::GetFeatSize(gdata)) {
-        Idx outoff = src * Functor::GetFeatSize(gdata) + tx;
+      while (tx < Functor::GetFeatSize(&gdata)) {
+        Idx outoff = src * Functor::GetFeatSize(&gdata) + tx;
         DType val = static_cast<DType>(0);
-        DType *outbuf = Functor::GetOutBuf(gdata);
+        DType *outbuf = Functor::GetOutBuf(&gdata);
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
           Idx dst = _ldg(csr.column_indices.data + eid);
-          if (Functor::CondEdge(src, dst, eid, gdata))
-            Functor::ApplyEdgeReduce(src, dst, eid, tx, val, gdata);
+          if (Functor::CondEdge(src, dst, eid, &gdata))
+            Functor::ApplyEdgeReduce(src, dst, eid, tx, val, &gdata);
         }
         if (outbuf != nullptr)
           outbuf[outoff] = val;
@@ -178,7 +178,7 @@ void CudaAdvanceAllNodeParallel(
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
   CudaAdvanceAllNodeParallelKernel<Idx, DType, Config, GData, Functor>
-    <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, gdata);
+    <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata);
 }
 
 template <typename Idx,
