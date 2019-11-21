@@ -51,6 +51,7 @@ struct MinuxMaxExpSum {
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static __device__ __forceinline__ void ApplyEdgeReduce(
       int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
+    const int dim = gdata->dim;
     gdata->score[gdata->eid_mapping[eid] * dim + feat_idx] =
         expf(gdata->score[gdata->eid_mapping[eid] * dim + feat_idx] - gdata->max[dst * dim + feat_idx]);
     val += gdata->score[gdata->eid_mapping[eid] * dim + feat_idx];

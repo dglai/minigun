@@ -49,7 +49,7 @@ struct MinusMaxExpSum {
   static __device__ __forceinline__ void ApplyEdgeReduce(
       int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
-    const float* score_off = gdata->score + gdata->eid_mapping[eid]* H;
+    const float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
     float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* max_off = gdata->max + dst * H;
     const float new_score = expf(__ldg(score_off + feat_idx) - __ldg(max_off + feat_idx));
