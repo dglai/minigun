@@ -38,7 +38,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
 
   // check accuracy
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
       rtcfg, csr, csr_t, coo, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
@@ -46,13 +46,13 @@ double RunMinigun(const utils::SampleCsr& scsr,
   // warm up
   const int K = 10;
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
         rtcfg, csr, csr_t, coo, &gdata, infront);
   }
 
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
         rtcfg, csr, csr_t, coo, &gdata, infront);
   }
   cudaEventRecord(stop);
