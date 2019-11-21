@@ -120,7 +120,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
       while (tx < gdata->GetFeatSize()) {
         Idx outoff = dst * gdata->GetFeatSize() + tx;
         DType val = static_cast<DType>(0);
-        DType *outbuf = gdata->GetOutBuf<Functor>();
+        auto *outbuf = gdata->GetOutBuf<Functor>();
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
@@ -141,12 +141,12 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
       while (tx < gdata->GetFeatSize()) {
         Idx outoff = src * gdata->GetFeatSize() + tx;
         DType val = static_cast<DType>(0);
-        DType *outbuf = gdata->GetOutBuf(Functor)();
+        auto *outbuf = gdata->GetOutBuf(Functor)();
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
           Idx dst = _ldg(csr.column_indices.data + eid);
-          if (Functor::CondEdge(src, dst, eid, &gdata))
+          if (Functor::CondEdge(src, dst, eid, gdata))
             Functor::ApplyEdgeReduce(src, dst, eid, tx, val, gdata);
         }
         if (outbuf != nullptr)
