@@ -141,7 +141,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
       while (tx < gdata->GetFeatSize()) {
         Idx outoff = src * Functor::GetFeatSize(gdata) + tx;
         DType val = static_cast<DType>(0);
-        auto *outbuf = Functor::GetOutBuf(gdata);
+        DType *outbuf = Functor::GetOutBuf(gdata);
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
