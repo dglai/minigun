@@ -41,10 +41,12 @@ struct EdgeMax {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
     float* inoff = gdata->score + gdata->eid_mapping[eid] * H;
-    aggre = max(aggre, __ldg(inoff + feat_idx));
+    val = max(val, __ldg(inoff + feat_idx));
   }
 };
 
@@ -55,25 +57,29 @@ struct MinusMaxExpSum {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
     const float* score_off = gdata->score + gdata->eid_mapping[eid]* H;
     float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* max_off = gdata->max + dst * H;
     const float new_score = expf(__ldg(score_off + feat_idx) - __ldg(max_off + feat_idx));
-    aggre += new_score;
+    val += new_score;
     *(ret_off + feat_idx) = new_score;
   }
 };
 
 // norm (node parallel by destinatino)
 struct NormByDst {
-   static __device__ __forceinline__ bool CondEdge(
+  static __device__ __forceinline__ bool CondEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
     float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* sum_off = gdata->sum + dst * H;

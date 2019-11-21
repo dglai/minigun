@@ -25,7 +25,6 @@ struct GData {
   __host__ __device__ __forceinline__ float* GetOutBuf() {
     return nullptr;
   }
-
   template <>
   __host__ __device__ __forceinline__ float* GetOutBuf<EdgeMax>() {
     return max;
@@ -44,9 +43,11 @@ struct EdgeMax {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int32_t dim = gdata->dim;
-    aggre = max(aggre, gdata->score[gdata->eid_mapping[eid] * dim + feat_idx]);
+    val = max(val, gdata->score[gdata->eid_mapping[eid] * dim + feat_idx]);
   }
 };
 
@@ -57,10 +58,12 @@ struct MinuxMaxExpSum {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     gdata->score[gdata->eid_mapping[eid] * dim + feat_idx] =
         expf(gdata->score[gdata->eid_mapping[eid] * dim + feat_idx] - gdata->max[dst * dim + feat_idx]);
-    aggre += gdata->score[gdata->eid_mapping[eid] * dim + feat_idx];
+    val += gdata->score[gdata->eid_mapping[eid] * dim + feat_idx];
   }
 };
 
@@ -80,6 +83,8 @@ struct Norm {
       tx += stride_x;
     }
   }
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {}
 };
 
 const int32_t D = 8;  // number of heads

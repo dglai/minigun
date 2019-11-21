@@ -28,8 +28,10 @@ struct SPMVFunctor {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
-    aggre += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
+    int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
+    val += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
   }
 };
 

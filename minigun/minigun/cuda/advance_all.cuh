@@ -106,30 +106,54 @@ template <typename Idx,
           typename GData,
           typename Functor>
 __global__ void CudaAdvanceAllNodeParallelKernel(
-    Csr<Idx> csr_t,
+    Csr<Idx> csr,
     GData gdata) {
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
   Idx tx = blockIdx.x * blockDim.x + threadIdx.x;
   Idx stride_y = blockDim.y * gridDim.y;
   Idx stride_x = blockDim.x * gridDim.x;
-  Idx dst = ty;
-  while (dst < csr_t.row_offsets.length - 1) {
-    Idx start = _ldg(csr_t.row_offsets.data + dst);
-    Idx end = _ldg(csr_t.row_offsets.data + dst + 1);
-    while (tx < gdata->GetFeatSize()) {
-      Idx outoff = dst * gdata->GetFeatSize() + tx;
-      double aggre = 0.;
-      DType *outbuf = gdata->GetOutBuf<Functor>();
-      if (outbuf != nullptr)
-        aggre = outbuf[outoff];
-      for (Idx eid = start; eid < end; ++eid) {
-        Idx src = _ldg(csr_t.column_indices.data + eid);
-        Functor::ApplyEdge(src, dst, eid, tx, aggre, &gdata);
+  if (Config::kParallel == kDst) {
+    Idx dst = ty;
+    while (dst < csr.row_offsets.length - 1) {
+      Idx start = _ldg(csr.row_offsets.data + dst);
+      Idx end = _ldg(csr.row_offsets.data + dst + 1);
+      while (tx < gdata->GetFeatSize()) {
+        Idx outoff = dst * gdata->GetFeatSize() + tx;
+        DType val = static_cast<DType>(0);
+        DType *outbuf = gdata->GetOutBuf<Functor>();
+        if (outbuf != nullptr)
+          val = outbuf[outoff];
+        for (Idx eid = start; eid < end; ++eid) {
+          Idx src = _ldg(csr.column_indices.data + eid);
+          if (Functor::CondEdge(src, dst, eid, &gdata))
+            Functor::ApplyEdgeReduce(src, dst, eid, tx, val, &gdata);
+        }
+        if (outbuf != nullptr)
+          outbuf[outoff] = val;
       }
-      if (outbuf != nullptr)
-        outbuf[outoff] = aggre;
+      dst += stride_y;
     }
-    dst += stride_y;
+  } else {
+    Idx src = ty;
+    whiel (src < csr.row_offsets.length - 1) {
+      Idx start = _ldg(csr.row_offsets.data + src);
+      Idx end = _ldg(csr.row_offsets.data + src + 1);
+      while (tx < gdata->GetFeatSize()) {
+        Idx outoff = src * gdata->GetFeatSize() + tx;
+        DType val = static_cast<DType>(0);
+        DType *outbuf = gdata->GetOutBuf(Functor)();
+        if (outbuf != nullptr)
+          val = outbuf[outoff];
+        for (Idx eid = start; eid < end; ++eid) {
+          Idx dst = _ldg(csr.column_indices.data + eid);
+          if (Functor::CondEdge(src, dst, eid, &gdata))
+            Functor::ApplyEdgeReduce(src, dst, eid, tx, val, &gdata);
+        }
+        if (outbuf != nullptr)
+          outbuf[outoff] = val;
+      }
+      src += stride_y;
+    }
   }
 }
 

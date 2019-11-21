@@ -12,6 +12,13 @@ struct GData {
   int H = 0;  // num heads
   float* ndata{nullptr};
   float* score{nullptr};
+  __host__ __device__ __forceinline__ int GetFeatSize() {
+    return -1;
+  }
+  template <typename Functor>
+  __host__ __device__ __forceinline__ float* GetOutBuf() {
+    return nullptr;
+  }
 };
 
 struct MaskedMMFunctor {
@@ -36,6 +43,8 @@ struct MaskedMMFunctor {
       h += blockDim.x;
     }
   }
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {}
 };
 
 void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
