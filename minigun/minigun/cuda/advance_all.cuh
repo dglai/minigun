@@ -117,7 +117,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     while (dst < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + dst);
       Idx end = _ldg(csr.row_offsets.data + dst + 1);
-      while (tx < gdata->GetFeatSize()) {
+      while (tx < Functor::GetFeatSize(gdata)) {
         Idx outoff = dst * Functor::GetFeatSize(gdata) + tx;
         DType val = static_cast<DType>(0);
         DType *outbuf = Functor::GetOutBuf(gdata);
@@ -138,7 +138,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     while (src < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + src);
       Idx end = _ldg(csr.row_offsets.data + src + 1);
-      while (tx < gdata->GetFeatSize()) {
+      while (tx < Functor::GetFeatSize(gdata)) {
         Idx outoff = src * Functor::GetFeatSize(gdata) + tx;
         DType val = static_cast<DType>(0);
         DType *outbuf = Functor::GetOutBuf(gdata);
