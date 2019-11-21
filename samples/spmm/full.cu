@@ -14,6 +14,13 @@ struct GData {
   float* next{nullptr};
   float* weight{nullptr};
   int* eid_mapping{nullptr};
+  __host__ __device__ __forceinline__ int GetFeatSize() {
+    return D;
+  }
+  template <typename Functor>
+  __host__ __device__ __forceinline__ float* GetOutBuf() {
+    return out;
+  }
 };
 
 struct SPMMFunctor {
@@ -22,14 +29,8 @@ struct SPMMFunctor {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t stride_x = blockDim.x * gridDim.x;
-    while (tx < gdata->dim) {
-      gdata->next[dst * gdata->dim + tx] +=
-          gdata->cur[src * gdata->dim + tx] * gdata->weight[gdata->eid_mapping[eid]];
-      tx += stride_x;
-    }
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
+      aggre += gdata->cur[src * gdata->dim + feat_idx] * gdata->weight[gdata->eid_mapping[eid]];
   }
 };
 
@@ -122,7 +123,7 @@ int main(int argc, char** argv) {
       vvec, evec);
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMMFunctor>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
       config, csr, csr_t, coo, &gdata, infront, nullptr);
 
   CUDA_CALL(cudaDeviceSynchronize());

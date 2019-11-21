@@ -9,12 +9,32 @@
 #include "../samples_utils.h"
 #include "../samples_io.h"
 
+struct EdgeMax;
+struct MinusMaxExpSum;
+
 struct GData {
   int32_t dim = 0;
   float* sum{nullptr};  // ndata
   float* max{nullptr};  // ndata
   float* score{nullptr};
   int* eid_mapping{nullptr};
+  __host__ __device__ __forceinline__ int GetFeatSize() {
+    return dim;
+  }
+  template <typename Functor>
+  __host__ __device__ __forceinline__ float* GetOutBuf() {
+    return nullptr;
+  }
+
+  template <>
+  __host__ __device__ __forceinline__ float* GetOutBuf<EdgeMax>() {
+    return max;
+  }
+
+  template <>
+  __host__ __device__ __forceinline__ float* GetOutBuf<MinusMaxExpSum>() {
+    return sum;
+  }
 };
 
 // Max
@@ -24,16 +44,9 @@ struct EdgeMax {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t stride_x = blockDim.x * gridDim.x;
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
     const int32_t dim = gdata->dim;
-    while (tx < dim) {
-      gdata->max[dst * dim + tx] = max(
-          gdata->max[dst * dim + dst * dim + tx],
-          gdata->score[gdata->eid_mapping[eid] * dim + tx]);
-      tx += stride_x;
-    }
+    aggre = max(aggre, gdata->score[gdata->eid_mapping[eid] * dim + feat_idx]);
   }
 };
 
@@ -44,17 +57,10 @@ struct MinuxMaxExpSum {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t stride_x = blockDim.x * gridDim.x;
-    const int32_t dim = gdata->dim;
-    while (tx < dim) {
-      gdata->score[gdata->eid_mapping[eid] * dim + tx] =
-          expf(gdata->score[gdata->eid_mapping[eid] * dim + tx] - gdata->max[dst * dim + tx]);
-      gdata->sum[dst * dim + tx] +=
-          gdata->score[gdata->eid_mapping[eid] * dim + tx];
-      tx += stride_x;
-    }
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
+    gdata->score[gdata->eid_mapping[eid] * dim + feat_idx] =
+        expf(gdata->score[gdata->eid_mapping[eid] * dim + feat_idx] - gdata->max[dst * dim + feat_idx]);
+    aggre += gdata->score[gdata->eid_mapping[eid] * dim + feat_idx];
   }
 };
 
@@ -175,11 +181,11 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> ConfigDst;
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> ConfigEdge;
-  minigun::advance::Advance<kDLGPU, int32_t, ConfigDst, GData, EdgeMax>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, ConfigDst, GData, EdgeMax>(
       config, csr, csr_t, coo, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, int32_t, ConfigDst, GData, MinuxMaxExpSum>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
       config, csr, csr_t, coo, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, int32_t, ConfigEdge, GData, Norm>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, ConfigEdge, GData, Norm>(
       config, csr, csr_t, coo, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());

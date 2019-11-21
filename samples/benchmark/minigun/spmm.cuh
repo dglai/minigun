@@ -14,6 +14,13 @@ struct GData {
   float* weight{nullptr}; // M
   float* out{nullptr};    // N*D
   int* eid_mapping{nullptr};
+  __host__ __device__ __forceinline__ int GetFeatSize() {
+    return D;
+  }
+  template <typename Functor>
+  __host__ __device__ __forceinline__ float* GetOutBuf() {
+    return out;
+  }
 };
 
 struct SPMMFunctor {
@@ -22,18 +29,12 @@ struct SPMMFunctor {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
     const int D = gdata->D;
     // each thread handles one attention head
-    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t stride_x = blockDim.x * gridDim.x;
     float* srcoff = gdata->ndata + src * D;
     float* eidoff = gdata->weight + gdata->eid_mapping[eid];
-    float* outoff = gdata->out + dst * D;
-    while (tx < D) {
-      outoff[tx] += __ldg(srcoff + tx) * __ldg(eidoff);
-      tx += stride_x;
-    }
+    aggre += __ldg(srcoff + feat_idx) * __ldg(eidoff);
   }
 };
 

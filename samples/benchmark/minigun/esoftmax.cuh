@@ -7,6 +7,9 @@
 
 namespace esoftmax {
 
+struct EdgeMax;
+struct MinusMaxExpSum;
+
 struct GData {
   int H = 0;  // num heads
   float* score{nullptr};
@@ -14,6 +17,21 @@ struct GData {
   float* max{nullptr};
   float* ret{nullptr};
   int* eid_mapping{nullptr};
+  __host__ __device__ __forceinline__ int GetFeatSize() {
+    return H;
+  }
+  template <typename Functor>
+  __host__ __device__ __forceinline__ float* GetOutBuf() {
+    return nullptr;
+  }
+  template <>
+  __host__ __device__ __forceinline__ float* GetOutBuf<EdgeMax>() {
+    return max;
+  }
+  template <>
+  __host__ __device__ __forceinline__ float* GetOutBuf<MinusMaxExpSum>() {
+    return sum;
+  }
 };
 
 // Max
@@ -23,16 +41,10 @@ struct EdgeMax {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
     const int H = gdata->H;
     float* inoff = gdata->score + gdata->eid_mapping[eid] * H;
-    float* outoff = gdata->max + dst * H;
-    while (tx < H) {
-      *(outoff + tx) = max(*(outoff + tx) , __ldg(inoff + tx));
-      tx += stride_x;
-    }
+    aggre = max(aggre, __ldg(inoff + feat_idx));
   }
 };
 
@@ -43,40 +55,14 @@ struct MinusMaxExpSum {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
     const int H = gdata->H;
     const float* score_off = gdata->score + gdata->eid_mapping[eid]* H;
     float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* max_off = gdata->max + dst * H;
-    float* sum_off = gdata->sum + dst * H;
-    while (tx < H) {
-      const float new_score = expf(__ldg(score_off + tx) - __ldg(max_off + tx));
-      sum_off[tx] += new_score;
-      *(ret_off + tx) = new_score;
-      tx += stride_x;
-    }
-  }
-};
-
-// norm (edge parallel)
-struct NormByEdge {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
-  static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
-    const int H = gdata->H;
-    float* ret_off = gdata->ret + eid * H;
-    float* sum_off = gdata->sum + dst * H;
-    while (tx < H) {
-      *(ret_off + tx) /= __ldg(sum_off + tx);
-      tx += stride_x;
-    }
+    const float new_score = expf(__ldg(score_off + feat_idx) - __ldg(max_off + feat_idx));
+    aggre += new_score;
+    *(ret_off + feat_idx) = new_score;
   }
 };
 
@@ -87,16 +73,11 @@ struct NormByDst {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
     const int H = gdata->H;
     float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* sum_off = gdata->sum + dst * H;
-    while (tx < H) {
-      *(ret_off + tx) /= __ldg(sum_off + tx);
-      tx += stride_x;
-    }
+    *(ret_off + feat_idx) /= __ldg(sum_off + tx);
   }
 };
 

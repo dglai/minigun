@@ -7,6 +7,9 @@
 
 namespace esoftmax_back {
 
+struct BackSoftmaxAccum;
+struct BackSoftmaxMinus;
+
 struct GData {
   int H = 0;  // num heads
   float* score{nullptr};
@@ -14,6 +17,17 @@ struct GData {
   float* accum{nullptr};
   float* out{nullptr};
   int* eid_mapping{nullptr};
+  __host__ __device__ __forceinline__ int GetFeatSize() {
+    return H;
+  }
+  template <typename Functor>
+  __host__ __device__ __forceinline__ float* GetOutBuf() {
+    return nullptr;
+  }
+  template <>
+  __host__ __device__ __forceinline__ float* GetOutBuf<BackSoftmaxAccum>() {
+    return accum;
+  }
 };
 
 // backward softmax phase 0
@@ -24,21 +38,15 @@ struct BackSoftmaxAccum {
   }
   // accum: (N, H)
   static __device__ __forceinline__ void ApplyEdge(
-    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
     const int H = gdata->H;
     // each thread handles one attention head
-    int h = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_h = blockDim.x * gridDim.x;
     float* score_off = gdata->score + eid * H;
     float* grad_score_off = gdata->grad_score + gdata->eid_mapping[eid] * H;
-    float* accum_off = gdata->accum + dst * H;
     float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
-    while (h < H) {
-      float sds = __ldg(score_off + h) * __ldg(grad_score_off + h);
-      accum_off[h] += sds;
-      *(ret_off + h) = sds;
-      h += stride_h;
-    }
+    float sds = __ldg(score_off + feat_idx) * __ldg(grad_score_off + feat_idx);
+    aggre += sds;
+    *(ret_off + feat_idx) = sds;
   }
 };
 
@@ -49,18 +57,13 @@ struct BackSoftmaxMinus {
   }
   // accum: (N, H)
   static __device__ __forceinline__ void ApplyEdge(
-    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& aggre, GData* gdata) {
     const int H = gdata->H;
     // each thread handles one attention head
-    int h = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_h = blockDim.x * gridDim.x;
     float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
     float* accum_off = gdata->accum + dst * H;
     float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
-    while (h < H) {
-      *(ret_off + h) -= __ldg(score_off + h) * __ldg(accum_off + h);
-      h += stride_h;
-    }
+    *(ret_off + feat_idx) -= __ldg(score_off + feat_idx) * __ldg(accum_off + feat_idx);
   }
 };
 

@@ -66,6 +66,7 @@ struct Config {
  */
 template <int XPU,
           typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -106,6 +107,7 @@ struct DispatchXPU {
  */
 template <int XPU,
           typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -122,7 +124,7 @@ void Advance(const RuntimeConfig& config,
       && output_frontier == nullptr) {
     LOG(FATAL) << "Require computing output frontier but no buffer is provided.";
   }
-  DispatchXPU<XPU, Idx, Config, GData, Functor, Alloc>::Advance(
+  DispatchXPU<XPU, Idx, DType, Config, GData, Functor, Alloc>::Advance(
       config, csr, csr_t, coo, gdata,
       input_frontier, output_frontier, alloc);
 }

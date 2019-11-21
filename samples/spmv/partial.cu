@@ -14,6 +14,13 @@ struct GData {
   float* next{nullptr};
   float* weight{nullptr};
   int* eid_mapping{nullptr};
+  __host__ __device__ __forceinline__ int GetFeatSize() {
+    return 1;
+  }
+  template <typename Functor>
+  __host__ __device__ __forceinline__ float* GetOutBuf() {
+    return out;
+  }
 };
 
 struct SPMVFunctor {
@@ -117,7 +124,7 @@ int main(int argc, char** argv) {
   //utils::VecPrint(truth);
 
   typedef minigun::advance::Config<false, minigun::advance::kV2N, minigun::advance::kEdge> Config;
-  minigun::advance::Advance<kDLGPU, int32_t,  Config, GData, SPMVFunctor>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMVFunctor>(
       config, csr, csr_t, coo, &gdata, infront, &outfront,
       utils::GPUAllocator::Get());
 
@@ -134,7 +141,7 @@ int main(int argc, char** argv) {
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, SPMVFunctor>(
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMVFunctor>(
         config, csr, csr_t, coo, &gdata, infront, &outfront,
         utils::GPUAllocator::Get());
   }

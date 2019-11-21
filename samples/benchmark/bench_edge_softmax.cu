@@ -111,7 +111,7 @@ double RunBaseline1(const utils::SampleCsr& scsr,
 int main(int argc, char** argv) {
   srand(42);
   if (argc < 3) {
-    std::cout << "USAGE: ./bench_masked_mm <file_name> <num_heads>" << std::endl;
+    std::cout << "USAGE: ./bench_edge_softmax <file_name> <num_heads>" << std::endl;
     return 1;
   }
   const char* filename = argv[1];

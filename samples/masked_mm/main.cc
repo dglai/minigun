@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
   //utils::VecPrint(truth);
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
-  minigun::advance::Advance<kDLCPU, int32_t, Config, GData, MaskedMMFunctor>(
+  minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MaskedMMFunctor>(
       config, csr, csr_t, coo, &gdata, infront);
 
   // verify output
@@ -112,13 +112,13 @@ int main(int argc, char** argv) {
 
   const int K = 10;
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, MaskedMMFunctor>(
+    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MaskedMMFunctor>(
         config, csr, csr_t, coo, &gdata, infront);
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, MaskedMMFunctor>(
+    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MaskedMMFunctor>(
         config, csr, csr_t, coo, &gdata, infront);
   }
   auto end = std::chrono::system_clock::now();

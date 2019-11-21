@@ -64,6 +64,7 @@ Idx ComputeOutputLength(Csr<Idx> csr,
 }
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -117,6 +118,7 @@ void CPUAdvance(Csr<Idx> csr,
 }
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -163,7 +165,7 @@ struct DispatchXPU<kDLCPU, Idx, Config, GData, Functor, Alloc> {
     }
 
     IntArray1D<Idx> outbuf = (output_frontier)? *output_frontier : IntArray1D<Idx>();
-    CPUAdvance<Idx, Config, GData, Functor, Alloc>(
+    CPUAdvance<Idx, DType, Config, GData, Functor, Alloc>(
         csr, gdata, input_frontier, outbuf, lcl_row_offsets, alloc);
 
     if (!Config::kAdvanceAll && Config::kMode != kV2N

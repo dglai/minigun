@@ -213,6 +213,7 @@ struct StridedIterator :
 };
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,

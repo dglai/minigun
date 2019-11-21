@@ -14,6 +14,7 @@ namespace minigun {
 namespace advance {
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -31,13 +32,13 @@ struct DispatchXPU<kDLGPU, Idx, Config, GData, Functor, Alloc> {
     // Call advance
     if (Config::kAdvanceAll) {
       AdvanceAlg algo = FindAdvanceAllAlgo<Idx, Config>(rtcfg, coo);
-      CudaAdvanceAll<Idx, Config, GData, Functor, Alloc>(
+      CudaAdvanceAll<Idx, DType, Config, GData, Functor, Alloc>(
           algo, rtcfg, csr, csr_t, coo, gdata, output_frontier, alloc);
     } else {
 #if ENABLE_PARTIAL_FRONTIER
       AdvanceAlg algo = FindAdvanceAlgo<Idx, Config>(rtcfg, coo,
           input_frontier);
-      CudaAdvanceExecutor<Idx, Config, GData, Functor, Alloc> exec(
+      CudaAdvanceExecutor<Idx, DType, Config, GData, Functor, Alloc> exec(
           algo, rtcfg, coo, gdata, input_frontier, output_frontier, alloc);
       exec.Run();
 #else

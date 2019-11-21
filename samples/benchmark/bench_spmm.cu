@@ -236,7 +236,7 @@ int main(int argc, char** argv) {
   const int feat_size = 2;
   */
   if (argc < 3) {
-    std::cout << "USAGE: ./bench_masked_mm <file_name> <feat_size>" << std::endl;
+    std::cout << "USAGE: ./bench_spmm <file_name> <feat_size>" << std::endl;
     return 1;
   }
   const char* filename = argv[1];

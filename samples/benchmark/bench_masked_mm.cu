@@ -34,7 +34,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
 
   // dry run
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MaskedMMFunctor>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MaskedMMFunctor>(
       cfg, csr, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
@@ -44,7 +44,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MaskedMMFunctor>(
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MaskedMMFunctor>(
         cfg, csr, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());

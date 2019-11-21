@@ -34,6 +34,7 @@ __device__ __forceinline__ Idx BinarySearchSrc(const IntArray1D<Idx>& array, Idx
 }
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor>
@@ -72,6 +73,7 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
 }
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -94,11 +96,12 @@ void CudaAdvanceAllGunrockLBOut(
   LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
     << nthrs.x << "," << nthrs.y << ")";
   */
-  CudaAdvanceAllGunrockLBOutKernel<Idx, Config, GData, Functor>
+  CudaAdvanceAllGunrockLBOutKernel<Idx, DType, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(coo, *gdata, output_frontier);
 }
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor>
@@ -106,22 +109,32 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     Csr<Idx> csr_t,
     GData gdata) {
   Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
+  Idx tx = blockIdx.x * blockDim.x + threadIdx.x;
   Idx stride_y = blockDim.y * gridDim.y;
+  Idx stride_x = blockDim.x * gridDim.x;
   Idx dst = ty;
   while (dst < csr_t.row_offsets.length - 1) {
     Idx start = _ldg(csr_t.row_offsets.data + dst);
     Idx end = _ldg(csr_t.row_offsets.data + dst + 1);
-    for (Idx eid = start; eid < end; ++eid) {
-      Idx src = _ldg(csr_t.column_indices.data + eid);
-      if (Functor::CondEdge(src, dst, eid, &gdata)) {
-        Functor::ApplyEdge(src, dst, eid, &gdata);
+    while (tx < gdata->GetFeatSize()) {
+      Idx outoff = dst * gdata->GetFeatSize() + tx;
+      double aggre = 0.;
+      DType *outbuf = gdata->GetOutBuf<Functor>();
+      if (outbuf != nullptr)
+        aggre = outbuf[outoff];
+      for (Idx eid = start; eid < end; ++eid) {
+        Idx src = _ldg(csr_t.column_indices.data + eid);
+        Functor::ApplyEdge(src, dst, eid, tx, aggre, &gdata);
       }
+      if (outbuf != nullptr)
+        outbuf[outoff] = aggre;
     }
     dst += stride_y;
   }
 }
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -140,11 +153,12 @@ void CudaAdvanceAllNodeParallel(
   const int by = std::min((N + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  CudaAdvanceAllNodeParallelKernel<Idx, Config, GData, Functor>
+  CudaAdvanceAllNodeParallelKernel<Idx, DType, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata);
 }
 
 template <typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -177,15 +191,15 @@ void CudaAdvanceAll(
     case kGunrockLBOut :
       switch (Config::kParallel) {
         case kSrc:
-          CudaAdvanceAllNodeParallel<Idx, Config, GData, Functor, Alloc>(
+          CudaAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>(
               rtcfg, csr, gdata, outbuf, alloc);
           break;
         case kEdge:
-          CudaAdvanceAllGunrockLBOut<Idx, Config, GData, Functor, Alloc>(
+          CudaAdvanceAllGunrockLBOut<Idx, DType, Config, GData, Functor, Alloc>(
               rtcfg, coo, gdata, outbuf, alloc);
           break;
         case kDst:
-          CudaAdvanceAllNodeParallel<Idx, Config, GData, Functor, Alloc>(
+          CudaAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>(
               rtcfg, csr_t, gdata, outbuf, alloc);
           break;
       }
