@@ -135,7 +135,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     }
   } else {
     Idx src = ty;
-    whiel (src < csr.row_offsets.length - 1) {
+    while (src < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + src);
       Idx end = _ldg(csr.row_offsets.data + src + 1);
       while (tx < gdata->GetFeatSize()) {

@@ -28,6 +28,8 @@ struct SPMMFunctor {
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
+  static __device__ __forceinline__ void ApplyEdge(
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static __device__ __forceinline__ void ApplyEdgeReduce(
       int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int D = gdata->D;
