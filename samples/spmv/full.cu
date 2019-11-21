@@ -26,10 +26,10 @@ struct SPMVFunctor {
       int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     val += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
   }
-  static __device__ __forceinline__ int32_t GetFeatSize(Gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return 1;
   }
-  static __device__ __forceinline__ float* GetOutBuf(Gdata* gdata) {
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->next;
   }
 };

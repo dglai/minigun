@@ -31,10 +31,10 @@ struct SPMMFunctor {
     float* eidoff = gdata->weight + gdata->eid_mapping[eid];
     val += __ldg(srcoff + feat_idx) * __ldg(eidoff);
   }
-  static __device__ __forceinline__ int32_t GetFeatSize(Gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return gdata->D;
   }
-  static __device__ __forceinline__ float* GetOutBuf(Gdata* gdata) {
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->out;
   }
 };

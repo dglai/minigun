@@ -30,10 +30,10 @@ struct EdgeMax {
     float* inoff = gdata->score + gdata->eid_mapping[eid] * H;
     val = max(val, __ldg(inoff + feat_idx));
   }
-  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return gdata->H;
   }
-  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->max;
   }
 };
@@ -56,10 +56,10 @@ struct MinusMaxExpSum {
     val += new_score;
     *(ret_off + feat_idx) = new_score;
   }
-  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return gdata->H;
   }
-  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->sum;
   }
 };
@@ -79,10 +79,10 @@ struct NormByDst {
     float* sum_off = gdata->sum + dst * H;
     *(ret_off + feat_idx) /= __ldg(sum_off + tx);
   }
-  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return gdata->H;
   }
-  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return nullptr;
   }
 };

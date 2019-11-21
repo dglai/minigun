@@ -36,10 +36,10 @@ struct BackSoftmaxAccum {
     val += sds;
     *(ret_off + feat_idx) = sds;
   }
-  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return gdata->H;
   }
-  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->accum;
   }
 };
@@ -61,10 +61,10 @@ struct BackSoftmaxMinus {
     float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
     *(ret_off + feat_idx) -= __ldg(score_off + feat_idx) * __ldg(accum_off + feat_idx);
   }
-  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetFeatSize(GData* gdata) {
     return gdata->H;
   }
-  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return nullptr;
   }
 };
