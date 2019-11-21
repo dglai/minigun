@@ -14,13 +14,6 @@ struct GData {
   float* next{nullptr};
   float* weight{nullptr};
   int* eid_mapping{nullptr};
-  __host__ __device__ __forceinline__ int GetFeatSize() {
-    return D;
-  }
-  template <typename Functor>
-  __host__ __device__ __forceinline__ float* GetOutBuf() {
-    return out;
-  }
 };
 
 struct SPMMFunctor {
@@ -33,6 +26,12 @@ struct SPMMFunctor {
   static __device__ __forceinline__ void ApplyEdgeReduce(
       int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
       val += gdata->cur[src * gdata->dim + feat_idx] * gdata->weight[gdata->eid_mapping[eid]];
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+    return gdata->D;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+    return gdata->out;
   }
 };
 

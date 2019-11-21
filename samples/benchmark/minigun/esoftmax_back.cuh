@@ -7,9 +7,6 @@
 
 namespace esoftmax_back {
 
-struct BackSoftmaxAccum;
-struct BackSoftmaxMinus;
-
 struct GData {
   int H = 0;  // num heads
   float* score{nullptr};
@@ -17,17 +14,6 @@ struct GData {
   float* accum{nullptr};
   float* out{nullptr};
   int* eid_mapping{nullptr};
-  __host__ __device__ __forceinline__ int GetFeatSize() {
-    return H;
-  }
-  template <typename Functor>
-  __host__ __device__ __forceinline__ float* GetOutBuf() {
-    return nullptr;
-  }
-  template <>
-  __host__ __device__ __forceinline__ float* GetOutBuf<BackSoftmaxAccum>() {
-    return accum;
-  }
 };
 
 // backward softmax phase 0
@@ -50,6 +36,12 @@ struct BackSoftmaxAccum {
     val += sds;
     *(ret_off + feat_idx) = sds;
   }
+  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+    return gdata->accum;
+  }
 };
 
 struct BackSoftmaxMinus {
@@ -68,6 +60,12 @@ struct BackSoftmaxMinus {
     float* accum_off = gdata->accum + dst * H;
     float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
     *(ret_off + feat_idx) -= __ldg(score_off + feat_idx) * __ldg(accum_off + feat_idx);
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+    return nullptr;
   }
 };
 

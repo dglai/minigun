@@ -14,13 +14,6 @@ struct GData {
   float* weight{nullptr}; // M
   float* out{nullptr};    // N*D
   int* eid_mapping{nullptr};
-  __host__ __device__ __forceinline__ int GetFeatSize() {
-    return D;
-  }
-  template <typename Functor>
-  __host__ __device__ __forceinline__ float* GetOutBuf() {
-    return out;
-  }
 };
 
 struct SPMMFunctor {
@@ -37,6 +30,12 @@ struct SPMMFunctor {
     float* srcoff = gdata->ndata + src * D;
     float* eidoff = gdata->weight + gdata->eid_mapping[eid];
     val += __ldg(srcoff + feat_idx) * __ldg(eidoff);
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(Gdata *gdata) {
+    return gdata->D;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(Gdata* gdata) {
+    return gdata->out;
   }
 };
 

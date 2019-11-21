@@ -7,9 +7,6 @@
 
 namespace esoftmax {
 
-struct EdgeMax;
-struct MinusMaxExpSum;
-
 struct GData {
   int H = 0;  // num heads
   float* score{nullptr};
@@ -17,21 +14,6 @@ struct GData {
   float* max{nullptr};
   float* ret{nullptr};
   int* eid_mapping{nullptr};
-  __host__ __device__ __forceinline__ int GetFeatSize() {
-    return H;
-  }
-  template <typename Functor>
-  __host__ __device__ __forceinline__ float* GetOutBuf() {
-    return nullptr;
-  }
-  template <>
-  __host__ __device__ __forceinline__ float* GetOutBuf<EdgeMax>() {
-    return max;
-  }
-  template <>
-  __host__ __device__ __forceinline__ float* GetOutBuf<MinusMaxExpSum>() {
-    return sum;
-  }
 };
 
 // Max
@@ -47,6 +29,12 @@ struct EdgeMax {
     const int H = gdata->H;
     float* inoff = gdata->score + gdata->eid_mapping[eid] * H;
     val = max(val, __ldg(inoff + feat_idx));
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+    return gdata->max;
   }
 };
 
@@ -68,6 +56,12 @@ struct MinusMaxExpSum {
     val += new_score;
     *(ret_off + feat_idx) = new_score;
   }
+  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+    return gdata->sum;
+  }
 };
 
 // norm (node parallel by destinatino)
@@ -84,6 +78,12 @@ struct NormByDst {
     float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* sum_off = gdata->sum + dst * H;
     *(ret_off + feat_idx) /= __ldg(sum_off + tx);
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(gdata *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(gdata* gdata) {
+    return nullptr;
   }
 };
 
