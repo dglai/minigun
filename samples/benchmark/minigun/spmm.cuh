@@ -26,10 +26,7 @@ struct SPMMFunctor {
   static __device__ __forceinline__ void ApplyEdgeReduce(
       int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int D = gdata->D;
-    // each thread handles one attention head
-    float* srcoff = gdata->ndata + src * D;
-    float* eidoff = gdata->weight + gdata->eid_mapping[eid];
-    val += __ldg(srcoff + feat_idx) * __ldg(eidoff);
+    val += gdata->ndata[src * D + feat_idx] * gdata->weight[eid];
   }
   static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return gdata->D;

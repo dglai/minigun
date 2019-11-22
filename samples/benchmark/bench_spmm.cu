@@ -28,7 +28,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
   // create stream
   RuntimeConfig rtcfg;
   rtcfg.ctx = {kDLGPU, 0};
-  int nt = utils::_FindNumThreads(gdata.D, 64);
+  int nt = utils::_FindNumThreads(gdata.D, 512);
   rtcfg.data_num_threads = nt;
   rtcfg.data_num_blocks = (gdata.D + (nt * 4) - 1) / (nt * 4);
   CUDA_CALL(cudaStreamCreate(&rtcfg.stream));

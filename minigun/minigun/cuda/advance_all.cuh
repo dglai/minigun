@@ -12,27 +12,6 @@ namespace advance {
 #define PER_THREAD_WORKLOAD 1
 #define MAX_NBLOCKS 65535
 
-// Binary search the row_offsets to find the source node of the edge id.
-template <typename Idx>
-__device__ __forceinline__ Idx BinarySearchSrc(const IntArray1D<Idx>& array, Idx eid) {
-  assert(0);
-  Idx lo = 0, hi = array.length - 1;
-  while (lo < hi) {
-    Idx mid = (lo + hi) >> 1;
-    if (_ldg(array.data + mid) <= eid) {
-      lo = mid + 1;
-    } else {
-      hi = mid;
-    }
-  }
-  // INVARIANT: lo == hi
-  if (_ldg(array.data + hi) == eid) {
-    return hi;
-  } else {
-    return hi - 1;
-  }
-}
-
 template <typename Idx,
           typename DType,
           typename Config,
@@ -112,25 +91,27 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
   Idx tx = blockIdx.x * blockDim.x + threadIdx.x;
   Idx stride_y = blockDim.y * gridDim.y;
   Idx stride_x = blockDim.x * gridDim.x;
+  Idx feat_size = Functor::GetFeatSize(&gdata);
+  DType *outbuf = Functor::GetOutBuf(&gdata);
+  DType val;
   if (Config::kParallel == kDst) {
     Idx dst = ty;
     while (dst < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + dst);
       Idx end = _ldg(csr.row_offsets.data + dst + 1);
-      while (tx < Functor::GetFeatSize(&gdata)) {
-        Idx outoff = dst * Functor::GetFeatSize(&gdata) + tx;
-        DType val = static_cast<DType>(0);
-        DType *outbuf = Functor::GetOutBuf(&gdata);
+      Idx feat_idx = tx;
+      while (feat_idx < feat_size) {
+        Idx outoff = dst * feat_size + feat_idx;
         if (outbuf != nullptr)
-          val = outbuf[outoff];
+          val = _ldg(outbuf + outoff);
         for (Idx eid = start; eid < end; ++eid) {
           Idx src = _ldg(csr.column_indices.data + eid);
           if (Functor::CondEdge(src, dst, eid, &gdata))
-            Functor::ApplyEdgeReduce(src, dst, eid, tx, val, &gdata);
+            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
         }
         if (outbuf != nullptr)
           outbuf[outoff] = val;
-        tx += stride_x;
+        feat_idx += stride_x;
       }
       dst += stride_y;
     }
@@ -139,20 +120,19 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     while (src < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + src);
       Idx end = _ldg(csr.row_offsets.data + src + 1);
-      while (tx < Functor::GetFeatSize(&gdata)) {
-        Idx outoff = src * Functor::GetFeatSize(&gdata) + tx;
-        DType val = static_cast<DType>(0);
-        DType *outbuf = Functor::GetOutBuf(&gdata);
+      Idx feat_idx = tx;
+      while (feat_idx < feat_size) {
+        Idx outoff = src * feat_size + feat_idx;
         if (outbuf != nullptr)
-          val = outbuf[outoff];
+          val = _ldg(outbuf + outoff);
         for (Idx eid = start; eid < end; ++eid) {
           Idx dst = _ldg(csr.column_indices.data + eid);
           if (Functor::CondEdge(src, dst, eid, &gdata))
-            Functor::ApplyEdgeReduce(src, dst, eid, tx, val, &gdata);
+            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
         }
         if (outbuf != nullptr)
           outbuf[outoff] = val;
-        tx += stride_x;
+        feat_idx += stride_x;
       }
       src += stride_y;
     }
@@ -174,11 +154,15 @@ void CudaAdvanceAllNodeParallel(
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
   const Idx N = csr.row_offsets.length - 1;
-  const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
+  const int ty = 1; //MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
   const int by = std::min((N + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
+  /*
+  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
+    << nthrs.x << "," << nthrs.y << ")";
+  */
   CudaAdvanceAllNodeParallelKernel<Idx, DType, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata);
 }
