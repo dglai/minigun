@@ -22,7 +22,19 @@ struct SPMMFunctor {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    const int D = gdata->D;
+    // each thread handles one attention head
+    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t stride_x = blockDim.x * gridDim.x;
+    float* srcoff = gdata->ndata + src * D;
+    float* eidoff = gdata->weight + eid;
+    float* outoff = gdata->out + dst * D;
+    while (tx < D) {
+      atomicAdd(outoff + tx, __ldg(srcoff + tx) * __ldg(eidoff));
+      tx += stride_x;
+    }
+  }
   static __device__ __forceinline__ void ApplyEdgeReduce(
       int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int D = gdata->D;
