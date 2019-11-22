@@ -126,9 +126,9 @@ template <typename Idx,
 struct DispatchXPU<kDLCPU, Idx, DType, Config, GData, Functor, Alloc> {
   static void Advance(
       const RuntimeConfig& rtcfg,
-      const Csr<Idx>& csr,
-      const Csr<Idx>& csr_t,
-      const Coo<Idx>& coo,
+      Csr<Idx>* csr,
+      Csr<Idx>* csr_t,
+      Coo<Idx>* coo,
       GData* gdata,
       IntArray1D<Idx> input_frontier,
       IntArray1D<Idx>* output_frontier,
@@ -140,15 +140,15 @@ struct DispatchXPU<kDLCPU, Idx, DType, Config, GData, Functor, Alloc> {
     IntArray1D<Idx> lcl_row_offsets;
     Idx out_len = 0;
     if (Config::kAdvanceAll) {
-      lcl_row_offsets = csr.row_offsets;
-      out_len = csr.column_indices.length;
+      lcl_row_offsets = csr->row_offsets;
+      out_len = csr->column_indices.length;
     } else {
       if (Config::kMode != kV2N && Config::kMode != kE2N) {
         lcl_row_offsets.length = input_frontier.length + 1;
         lcl_row_offsets.data = alloc->template AllocateWorkspace<Idx>(
             lcl_row_offsets.length * sizeof(Idx));
         out_len = ComputeOutputLength(
-            csr, input_frontier, &lcl_row_offsets, alloc);
+            *csr, input_frontier, &lcl_row_offsets, alloc);
       }
     }
     if (output_frontier) {
@@ -166,7 +166,7 @@ struct DispatchXPU<kDLCPU, Idx, DType, Config, GData, Functor, Alloc> {
 
     IntArray1D<Idx> outbuf = (output_frontier)? *output_frontier : IntArray1D<Idx>();
     CPUAdvance<Idx, DType, Config, GData, Functor, Alloc>(
-        csr, gdata, input_frontier, outbuf, lcl_row_offsets, alloc);
+        *csr, gdata, input_frontier, outbuf, lcl_row_offsets, alloc);
 
     if (!Config::kAdvanceAll && Config::kMode != kV2N
         && Config::kMode != kE2N) {

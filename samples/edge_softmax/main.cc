@@ -150,11 +150,11 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, EdgeMax>(
-      config, csr, csr_t, coo, &gdata, infront);
+      config, &csr, &csr_t, &coo, &gdata, infront);
   minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MinuxMaxExpSum>(
-      config, csr, csr_t, coo, &gdata, infront);
+      config, &csr, &csr_t, &coo, &gdata, infront);
   minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, Norm>(
-      config, csr, csr_t, coo, &gdata, infront);
+      config, &csr, &csr_t, &coo, &gdata, infront);
 
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, evec) << std::endl;
@@ -162,21 +162,21 @@ int main(int argc, char** argv) {
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, EdgeMax>(
-        config, csr, csr_t, coo, &gdata, infront);
+        config, &csr, &csr_t, &coo, &gdata, infront);
     minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MinuxMaxExpSum>(
-        config, csr, csr_t, coo, &gdata, infront);
+        config, &csr, &csr_t, &coo, &gdata, infront);
     minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, Norm>(
-        config, csr, csr_t, coo, &gdata, infront);
+        config, &csr, &csr_t, &coo, &gdata, infront);
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, EdgeMax>(
-        config, csr, csr_t, coo, &gdata, infront);
+        config, &csr, &csr_t, &coo, &gdata, infront);
     minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MinuxMaxExpSum>(
-        config, csr, csr_t, coo, &gdata, infront);
+        config, &csr, &csr_t, &coo, &gdata, infront);
     minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, Norm>(
-        config, csr, csr_t, coo, &gdata, infront);
+        config, &csr, &csr_t, &coo, &gdata, infront);
   }
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;

@@ -176,9 +176,9 @@ template <typename Idx,
 void CudaAdvanceAll(
     AdvanceAlg algo,
     const RuntimeConfig& rtcfg,
-    const Csr<Idx>& csr,
-    const Csr<Idx>& csr_t,
-    const Coo<Idx>& coo,
+    Csr<Idx>* csr,
+    Csr<Idx>* csr_t,
+    Coo<Idx>* coo,
     GData* gdata,
     IntArray1D<Idx>* output_frontier,
     Alloc* alloc) {
@@ -200,17 +200,17 @@ void CudaAdvanceAll(
   switch (algo) {
     case kGunrockLBOut :
       switch (Config::kParallel) {
-        case kSrc:
+        case kSrc
           CudaAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>(
-              rtcfg, csr, gdata, outbuf, alloc);
+              rtcfg, *csr, gdata, outbuf, alloc);
           break;
         case kEdge:
           CudaAdvanceAllGunrockLBOut<Idx, DType, Config, GData, Functor, Alloc>(
-              rtcfg, coo, gdata, outbuf, alloc);
+              rtcfg, *coo, gdata, outbuf, alloc);
           break;
         case kDst:
           CudaAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>(
-              rtcfg, csr_t, gdata, outbuf, alloc);
+              rtcfg, *csr_t, gdata, outbuf, alloc);
           break;
       }
       break;

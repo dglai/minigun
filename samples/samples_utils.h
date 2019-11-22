@@ -11,7 +11,7 @@
 
 namespace utils {
 
-#define FCLOSE(a, b) (fabs((a) - (b)) < 1e-5 * fabs(a) + 1e-4)
+#define FCLOSE(a, b) (fabs((a) - (b)) < 1e-4 * fabs(a) + 1e-4)
 
 template<typename T>
 void VecPrint(const std::vector<T>& vec) {

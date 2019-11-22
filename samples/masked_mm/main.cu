@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MaskedMMFunctor>(
-      config, csr, csr_t, coo, &gdata, infront);
+      config, &csr, &csr_t, &coo, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 
