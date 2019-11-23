@@ -2,7 +2,7 @@
 #define MINIGUN_ADVANCE_H_
 
 #include "./base.h"
-#include "./csr.h"
+#include "spmat.h"
 #include "./mem.h"
 #ifdef __CUDACC__
 #include <cuda_runtime.h>
@@ -113,9 +113,7 @@ template <int XPU,
           typename Functor,
           typename Alloc = DefaultAllocator<XPU> >
 void Advance(const RuntimeConfig& config,
-             const Csr<Idx>& csr,
-             const Csr<Idx>& csr_t,
-             const Coo<Idx>& coo,
+             const SpMat<Idx>& spmat,
              GData* gdata,
              IntArray1D<Idx> input_frontier,
              IntArray1D<Idx>* output_frontier = nullptr,
@@ -125,7 +123,7 @@ void Advance(const RuntimeConfig& config,
     LOG(FATAL) << "Require computing output frontier but no buffer is provided.";
   }
   DispatchXPU<XPU, Idx, DType, Config, GData, Functor, Alloc>::Advance(
-      config, csr, csr_t, coo, gdata,
+      config, spmat, gdata,
       input_frontier, output_frontier, alloc);
 }
 

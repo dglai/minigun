@@ -151,6 +151,7 @@ int main(int argc, char** argv) {
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLGPU);
+  minigun::IntSpMat spmat = {&csr, &coo, &csr_t};
 
   // Create stream
   minigun::advance::RuntimeConfig config;
@@ -190,11 +191,11 @@ int main(int argc, char** argv) {
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> ConfigDst;
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> ConfigEdge;
   minigun::advance::Advance<kDLGPU, int32_t, float, ConfigDst, GData, EdgeMax>(
-      config, csr, csr_t, coo, &gdata, infront);
+      config, spmat, &gdata, infront);
   minigun::advance::Advance<kDLGPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
-      config, csr, csr_t, coo, &gdata, infront);
+      config, spmat, &gdata, infront);
   minigun::advance::Advance<kDLGPU, int32_t, float, ConfigEdge, GData, Norm>(
-      config, csr, csr_t, coo, &gdata, infront);
+      config, spmat, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 

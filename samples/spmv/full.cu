@@ -79,6 +79,7 @@ int main(int argc, char** argv) {
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLGPU);
+  minigun::IntSpMat spmat = {&csr, &coo, &csr_t};
 
   // Create stream
   minigun::advance::RuntimeConfig config;
@@ -113,7 +114,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMVFunctor>(
-      config, csr, csr_t, coo, &gdata, infront, nullptr,
+      config, spmat, &gdata, infront, nullptr,
       utils::GPUAllocator::Get());
 
   CUDA_CALL(cudaDeviceSynchronize());
@@ -130,7 +131,7 @@ int main(int argc, char** argv) {
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMVFunctor>(
-        config, csr, csr_t, coo, &gdata, infront, nullptr,
+        config, spmat, &gdata, infront, nullptr,
         utils::GPUAllocator::Get());
   }
   CUDA_CALL(cudaDeviceSynchronize());

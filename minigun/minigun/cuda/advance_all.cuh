@@ -27,12 +27,6 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
   while (eid < coo.column.length) {
     Idx src = _ldg(coo.row.data + eid);
     Idx dst = _ldg(coo.column.data + eid);
-    /* TODO(zihao): what is this?
-    if (src + dst < 0) {
-      // garbage code that cannot be optimized out but will never be executed
-      gdata.out[0] = -1;
-    }
-    */
     if (Functor::CondEdge(src, dst, eid, &gdata)) {
       Functor::ApplyEdge(src, dst, eid, &gdata);
       // Add dst/eid to output frontier
@@ -154,7 +148,7 @@ void CudaAdvanceAllNodeParallel(
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
   const Idx N = csr.row_offsets.length - 1;
-  const int ty = 1; //MAX_NTHREADS / rtcfg.data_num_threads;
+  const int ty = 1;
   const int ny = ty * PER_THREAD_WORKLOAD;
   const int by = std::min((N + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
@@ -176,12 +170,11 @@ template <typename Idx,
 void CudaAdvanceAll(
     AdvanceAlg algo,
     const RuntimeConfig& rtcfg,
-    const Csr<Idx>& csr,
-    const Csr<Idx>& csr_t,
-    const Coo<Idx>& coo,
+    const SpMat<Idx> &spmat,
     GData* gdata,
     IntArray1D<Idx>* output_frontier,
     Alloc* alloc) {
+  /*
   Idx out_len = coo.column.length;
   if (output_frontier) {
     if (output_frontier->data == nullptr) {
@@ -196,21 +189,22 @@ void CudaAdvanceAll(
         << " but only got a buffer of length " << output_frontier->length;
     }
   }
-  IntArray1D<Idx> outbuf = (output_frontier)? *output_frontier : IntArray1D<Idx>();
+   */
+  IntArray1D<Idx> outbuf = IntArray1D<Idx>(); //(output_frontier)? *output_frontier : IntArray1D<Idx>();
   switch (algo) {
     case kGunrockLBOut :
       switch (Config::kParallel) {
         case kSrc:
           CudaAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>(
-              rtcfg, csr, gdata, outbuf, alloc);
+              rtcfg, *spmat.csr, gdata, outbuf, alloc);
           break;
         case kEdge:
           CudaAdvanceAllGunrockLBOut<Idx, DType, Config, GData, Functor, Alloc>(
-              rtcfg, coo, gdata, outbuf, alloc);
+              rtcfg, *spmat.coo, gdata, outbuf, alloc);
           break;
         case kDst:
           CudaAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>(
-              rtcfg, csr_t, gdata, outbuf, alloc);
+              rtcfg, *spmat.csr_t, gdata, outbuf, alloc);
           break;
       }
       break;

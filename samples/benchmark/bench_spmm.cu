@@ -15,9 +15,7 @@ using minigun::advance::RuntimeConfig;
 using namespace spmm;
 
 double RunMinigun(const utils::SampleCsr& scsr,
-                  const minigun::IntCsr& csr,
-                  const minigun::IntCsr& csr_t,
-                  const minigun::IntCoo& coo,
+                  const minigun::IntSpMat& spmat,
                   int32_t feat_size,
                   GData& gdata,
                   GData& truth) {
@@ -39,7 +37,7 @@ double RunMinigun(const utils::SampleCsr& scsr,
   // check accuracy
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
-      rtcfg, csr, csr_t, coo, &gdata, infront);
+      rtcfg, spmat, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -47,13 +45,13 @@ double RunMinigun(const utils::SampleCsr& scsr,
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
-        rtcfg, csr, csr_t, coo, &gdata, infront);
+        rtcfg, spmat, &gdata, infront);
   }
 
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
-        rtcfg, csr, csr_t, coo, &gdata, infront);
+        rtcfg, spmat, &gdata, infront);
   }
   cudaEventRecord(stop);
   CUDA_CALL(cudaEventSynchronize(stop));
@@ -256,6 +254,7 @@ int main(int argc, char** argv) {
   auto pack = utils::ToMinigunReverseCsr(scsr, csr_mapping, kDLGPU);
   minigun::IntCsr csr_t = pack.first;
   minigun::IntArray csr_t_mapping = pack.second;
+  minigun::IntSpMat spmat = {&csr, &coo, &csr_t};
 
   // gdata
   GData gdata, truth;
@@ -268,7 +267,7 @@ int main(int argc, char** argv) {
   //double dur2 = 0;
   double dur2 = RunBaseline2(scsr, csr_t, feat_size, gdata, truth);
   //double dur3 = 0;
-  double dur3 = RunMinigun(scsr, csr, csr_t, coo, feat_size, gdata, truth);
+  double dur3 = RunMinigun(scsr, spmat, feat_size, gdata, truth);
   std::cout << N << "," << M << "," << feat_size << "," << dur1 << "," << dur2 << "," << dur3 << "\n";
   FreeGData(&gdata, &truth);
   cudaDeviceReset();

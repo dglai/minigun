@@ -126,13 +126,12 @@ template <typename Idx,
 struct DispatchXPU<kDLCPU, Idx, DType, Config, GData, Functor, Alloc> {
   static void Advance(
       const RuntimeConfig& rtcfg,
-      const Csr<Idx>& csr,
-      const Csr<Idx>& csr_t,
-      const Coo<Idx>& coo,
+      const SpMat<Idx>& spmat,
       GData* gdata,
       IntArray1D<Idx> input_frontier,
       IntArray1D<Idx>* output_frontier,
       Alloc* alloc) {
+    const Csr<Idx> csr = *spmat.csr;
     if (Config::kMode != kV2V && Config::kMode != kV2E
         && Config::kMode != kV2N) {
       LOG(FATAL) << "Advance from edge not supported for CPU";

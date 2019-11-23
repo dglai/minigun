@@ -66,6 +66,7 @@ int main(int argc, char** argv) {
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLCPU);
+  minigun::IntSpMat spmat = {&csr, &coo, &csr_t};
 
   // prepare frontiers
   minigun::IntArray infront, outfront;
@@ -103,7 +104,7 @@ int main(int argc, char** argv) {
 
   typedef minigun::advance::Config<false, minigun::advance::kV2N, minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMVFunctor>(
-      config, csr, csr_t, coo, &gdata, infront, &outfront,
+      config, spmat, &gdata, infront, &outfront,
       utils::CPUAllocator::Get());
 
   // verify output
@@ -113,14 +114,14 @@ int main(int argc, char** argv) {
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMVFunctor>(
-        config, csr, csr_t, coo, &gdata, infront, &outfront,
+        config, spmat, &gdata, infront, &outfront,
         utils::CPUAllocator::Get());
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMVFunctor>(
-        config, csr, csr_t, coo, &gdata, infront, &outfront,
+        config, spmat, &gdata, infront, &outfront,
         utils::CPUAllocator::Get());
   }
   auto end = std::chrono::system_clock::now();

@@ -35,6 +35,15 @@ struct Coo {
 using IntCoo = Coo<int32_t>;
 using LongCoo = Coo<int64_t>;
 
+template <typename Idx>
+struct SpMat {
+  Csr<Idx>* csr = nullptr;
+  Csr<Idx>* csr_t = nullptr;
+  Coo<Idx>* coo = nullptr;
+};
+using IntSpMat = SpMat<int32_t>;
+using LongSpMat = SpMat<int64_t>;
+
 }  // namespace minigun
 
 #endif  // MINIGUN_CSR_H_
