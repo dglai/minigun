@@ -29,7 +29,7 @@ struct DispatchXPU<kDLGPU, Idx, DType, Config, GData, Functor, Alloc> {
       Alloc* alloc) {
     // Call advance
     if (Config::kAdvanceAll) {
-      AdvanceAlg algo = FindAdvanceAllAlgo<Idx, Config>(rtcfg, coo);
+      AdvanceAlg algo = FindAdvanceAllAlgo<Idx, Config>(rtcfg, *spmat.coo); // TODO(zihao): fix this
       CudaAdvanceAll<Idx, DType, Config, GData, Functor, Alloc>(
           algo, rtcfg, spmat, gdata, output_frontier, alloc);
     } else {
