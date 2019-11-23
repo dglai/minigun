@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
   auto pack = utils::ToMinigunReverseCsr(scsr, csr_mapping, kDLGPU);
   minigun::IntCsr csr_t = pack.first;
   minigun::IntArray csr_t_mapping = pack.second;
-  minigun::IntSpMat spmat;
+  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
   spmat.csr = &csr;
   spmat.coo = &coo;
   spmat.csr_t = &csr_t;

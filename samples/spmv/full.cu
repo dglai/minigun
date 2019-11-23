@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLGPU);
-  minigun::IntSpMat spmat = {&csr, &coo, &csr_t};
+  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
 
   // Create stream
   minigun::advance::RuntimeConfig config;
