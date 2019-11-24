@@ -14,9 +14,7 @@ using minigun::advance::RuntimeConfig;
 using namespace esoftmax;
 
 double RunMinigun(const utils::SampleCsr& scsr,
-                  const minigun::IntCsr& csr,
-                  const minigun::IntCsr& csr_t,
-                  const minigun::IntCoo& coo,
+                  const minigun::IntSpMat& spmat,
                   const minigun::IntArray& eid_mapping,
                   int32_t feat_size, int32_t num_heads) {
   // gdata
@@ -38,11 +36,11 @@ double RunMinigun(const utils::SampleCsr& scsr,
   // dry run
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
-      rtcfg, csr, csr_t, coo, &gdata, infront);
+      rtcfg, spmat, &gdata, infront);
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinusMaxExpSum>(
-      rtcfg, csr, csr_t, coo, &gdata, infront);
+      rtcfg, spmat, &gdata, infront);
   minigun::advance::Advance<kDLGPU, int32_t, Config, GData, NormByDst>(
-      rtcfg, csr, csr_t, coo, &gdata, infront);
+      rtcfg, spmat, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -51,11 +49,11 @@ double RunMinigun(const utils::SampleCsr& scsr,
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
-        rtcfg, csr, csr_t, coo, &gdata, infront);
+        rtcfg, spmat, &gdata, infront);
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinusMaxExpSum>(
-        rtcfg, csr, csr_t, coo, &gdata, infront);
+        rtcfg, spmat, &gdata, infront);
     minigun::advance::Advance<kDLGPU, int32_t, Config, GData, NormByDst>(
-        rtcfg, csr, csr_t, coo, &gdata, infront);
+        rtcfg, spmat, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
   gettimeofday(&t1, nullptr);
@@ -131,8 +129,9 @@ int main(int argc, char** argv) {
   minigun::IntCsr csr_t = pack.first;
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
+  minigun::IntSpMat spmat = {nullptr, &csr_t, nullptr};
 
-  double dur1 = RunMinigun(scsr, csr, csr_t, coo, csr_t_mapping, 0, num_heads);
+  double dur1 = RunMinigun(scsr, spmat, csr_t_mapping, 0, num_heads);
   std::cout << "minigun time(ms): " << dur1 << std::endl;
   double dur2 = RunBaseline1(scsr, csr, csr_t_mapping, 0, num_heads);
   std::cout << "baseline1 time(ms): " << dur2 << std::endl;

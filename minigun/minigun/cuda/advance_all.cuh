@@ -60,7 +60,7 @@ void CudaAdvanceAllGunrockLBOut(
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
   const Idx M = coo.column.length;
-  const int ty = MAX_NTHREADS / rtcfg.data_num_threads;
+  const int 1; //ty = MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
   const int by = std::min((M + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
@@ -148,7 +148,7 @@ void CudaAdvanceAllNodeParallel(
   CHECK_GT(rtcfg.data_num_blocks, 0);
   CHECK_GT(rtcfg.data_num_threads, 0);
   const Idx N = csr.row_offsets.length - 1;
-  const int ty = 1;
+  const int ty = 1; //ty = MAX_NTHREADS / rtcfg.data_num_threads;
   const int ny = ty * PER_THREAD_WORKLOAD;
   const int by = std::min((N + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
