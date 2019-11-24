@@ -121,6 +121,7 @@ int main(int argc, char** argv) {
 
   // csr
   minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
+  minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
   minigun::IntSpMat spmat = {nullptr, nullptr, &coo};
 
   double dur1 = RunMinigun(scsr, spmat, feat_size, num_heads);
