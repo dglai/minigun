@@ -95,7 +95,7 @@ void InitGData(const utils::SampleCsr& csr,
   CUDA_CALL(cudaMalloc(&(gdata->grad_score), sizeof(float) * grad_score.size()));
   CUDA_CALL(cudaMemcpy(gdata->grad_score, &grad_score[0],
         sizeof(float) * grad_score.size(), cudaMemcpyHostToDevice));
-  gdata->eid_mapping = eid_mapping;
+  gdata->eid_mapping = eid_mapping.data;
 
   // compute truth
   truth->out = new float[M * H];
