@@ -255,9 +255,6 @@ int main(int argc, char** argv) {
   minigun::IntCsr csr_t = pack.first;
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
-  spmat.csr = &csr;
-  spmat.coo = &coo;
-  spmat.csr_t = &csr_t;
 
   // gdata
   GData gdata, truth;
