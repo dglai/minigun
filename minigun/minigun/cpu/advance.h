@@ -2,6 +2,7 @@
 #define MINIGUN_CPU_ADVANCE_H_
 
 #include "../advance.h"
+#include "./advance_all.h"
 #include <dmlc/omp.h>
 
 namespace minigun {
