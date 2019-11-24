@@ -20,3 +20,13 @@ for grh in bench-graphs/*;do
     ./build/samples/benchmark/bench_spmm ${grh} $D || exit 1
   done
 done
+
+# masked mm test
+echo "===========Masked MM test==========="
+for grh in bench-graphs/*;do
+  for D in 8 32 64 128; do
+    for H in 8 16 32; do
+      ./build/samples/benchmark/bench_masked_mm ${grh} $D $H || exit 1
+    done
+  done
+done
