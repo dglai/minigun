@@ -77,7 +77,7 @@ struct NormByDst {
     const int H = gdata->H;
     float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* sum_off = gdata->sum + dst * H;
-    *(ret_off + feat_idx) /= __ldg(sum_off + tx);
+    *(ret_off + feat_idx) /= __ldg(sum_off + feat_idx);
   }
   static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return gdata->H;
