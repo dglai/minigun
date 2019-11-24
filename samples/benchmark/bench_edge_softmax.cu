@@ -35,11 +35,11 @@ double RunMinigun(const utils::SampleCsr& scsr,
 
   // dry run
   typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, EdgeMax>(
       rtcfg, spmat, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinusMaxExpSum>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MinusMaxExpSum>(
       rtcfg, spmat, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, NormByDst>(
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, NormByDst>(
       rtcfg, spmat, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
@@ -48,11 +48,11 @@ double RunMinigun(const utils::SampleCsr& scsr,
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, EdgeMax>(
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, EdgeMax>(
         rtcfg, spmat, &gdata, infront);
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MinusMaxExpSum>(
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MinusMaxExpSum>(
         rtcfg, spmat, &gdata, infront);
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, NormByDst>(
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, NormByDst>(
         rtcfg, spmat, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
@@ -128,7 +128,6 @@ int main(int argc, char** argv) {
   auto pack = utils::ToMinigunReverseCsr(scsr, csr_mapping, kDLGPU);
   minigun::IntCsr csr_t = pack.first;
   minigun::IntArray csr_t_mapping = pack.second;
-  minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
   minigun::IntSpMat spmat = {nullptr, &csr_t, nullptr};
 
   double dur1 = RunMinigun(scsr, spmat, csr_t_mapping, 0, num_heads);
