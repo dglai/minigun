@@ -38,3 +38,11 @@ for grh in bench-graphs/*;do
     ./build/samples/benchmark/bench_edge_softmax ${grh} $H || exit 1
   done
 done
+
+# backward edge softmax test
+echo "===========Backward edge softmax test==========="
+for grh in bench-graphs/*;do
+  for H in 8 16 32; do
+    ./build/samples/benchmark/bench_backward_edge_softmax ${grh} $H || exit 1
+  done
+done

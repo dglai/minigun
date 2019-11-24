@@ -248,13 +248,12 @@ int main(int argc, char** argv) {
   //std::cout << "#Nodes: " << N << " #Edges: " << M << std::endl;
 
   // csr
-  minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
   minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
   auto csr_mapping = utils::arange(0, M, kDLGPU);
   auto pack = utils::ToMinigunReverseCsr(scsr, csr_mapping, kDLGPU);
   minigun::IntCsr csr_t = pack.first;
   minigun::IntArray csr_t_mapping = pack.second;
-  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
+  minigun::IntSpMat spmat = {nullptr, &csr_t, nullptr};
 
   // gdata
   GData gdata, truth;

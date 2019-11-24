@@ -70,7 +70,10 @@ struct BackSoftmaxMinus {
 };
 
 
-void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
+void InitGData(const utils::SampleCsr& csr,
+               const minigun::IntArray& eid_mapping,
+               GData* gdata,
+               GData* truth) {
   const int32_t N = csr.row_offsets.size() - 1;
   const int32_t M = csr.column_indices.size();
   const int H = gdata->H;
@@ -92,6 +95,8 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   CUDA_CALL(cudaMalloc(&(gdata->grad_score), sizeof(float) * grad_score.size()));
   CUDA_CALL(cudaMemcpy(gdata->grad_score, &grad_score[0],
         sizeof(float) * grad_score.size(), cudaMemcpyHostToDevice));
+  gdata->eid_mapping = eid_mapping;
+
   // compute truth
   truth->out = new float[M * H];
   for (size_t u = 0; u < csr.row_offsets.size() - 1; u++) {
