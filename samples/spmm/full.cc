@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMMFunctor>(
       config, spmat, &gdata, infront, nullptr,
       utils::CPUAllocator::Get());
