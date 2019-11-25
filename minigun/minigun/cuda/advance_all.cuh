@@ -90,12 +90,12 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
   DType val;
   if (Config::kParallel == kDst) {
     Idx dst = ty;
+    Idx outoff = dst * feat_size + feat_idx;
     while (dst < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + dst);
       Idx end = _ldg(csr.row_offsets.data + dst + 1);
       Idx feat_idx = tx;
       while (feat_idx < feat_size) {
-        Idx outoff = dst * feat_size + feat_idx;
         if (outbuf != nullptr)
           val = _ldg(outbuf + outoff);
         for (Idx eid = start; eid < end; ++eid) {
@@ -111,12 +111,12 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
     }
   } else {
     Idx src = ty;
+    Idx outoff = src * feat_size + feat_idx;
     while (src < csr.row_offsets.length - 1) {
       Idx start = _ldg(csr.row_offsets.data + src);
       Idx end = _ldg(csr.row_offsets.data + src + 1);
       Idx feat_idx = tx;
       while (feat_idx < feat_size) {
-        Idx outoff = src * feat_size + feat_idx;
         if (outbuf != nullptr)
           val = _ldg(outbuf + outoff);
         for (Idx eid = start; eid < end; ++eid) {
