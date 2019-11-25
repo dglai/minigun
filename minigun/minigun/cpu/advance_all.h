@@ -40,8 +40,8 @@ void CPUAdvanceAllNodeParallel(
     const Csr<Idx>& csr,
     GData *gdata) {
   Idx N = csr.row_offsets.length - 1;
-  Idx feat_size = Functor::GetFeatSize(&gdata);
-  DType *outbuf = Functor::GetOutBuf(&gdata);
+  Idx feat_size = Functor::GetFeatSize(gdata);
+  DType *outbuf = Functor::GetOutBuf(gdata);
   DType val;
   if (Config::kParallel == kDst) {
 #pragma omp parallel for
