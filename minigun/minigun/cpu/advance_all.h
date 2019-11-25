@@ -70,7 +70,7 @@ void CPUAdvanceAllNodeParallel(
       const Idx start = csr.row_offsets.data[src];
       const Idx end = csr.row_offsets.data[src + 1];
       for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
-        Idx outoff = dst * feat_size + feat_idx;
+        Idx outoff = src * feat_size + feat_idx;
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
