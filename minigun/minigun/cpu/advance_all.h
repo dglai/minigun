@@ -97,13 +97,16 @@ void CPUAdvanceAll(
       GData* gdata) {
   switch (Config::kParallel) {
     case kSrc:
-      CPUAdvanceAllNodeParallel(*spmat.csr, gdata);
+      CPUAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>
+          (*spmat.csr, gdata);
       break;
     case kEdge:
-      CPUAdvanceAllEdgeParallel(*spmat.coo, gdata);
+      CPUAdvanceAllEdgeParallel<Idx, DType, Config, GData, Functor, Alloc>
+          (*spmat.coo, gdata);
       break;
     case kDst:
-      CPUAdvanceAllNodeParallel(*spmat.csr_t, gdata);
+      CPUAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>
+          (*spmat.csr_t, gdata);
       break;
   }
 }
