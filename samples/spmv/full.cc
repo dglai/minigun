@@ -12,6 +12,7 @@ struct GData {
   float* cur{nullptr};
   float* next{nullptr};
   float* weight{nullptr};
+  int* eid_mapping{nullptr};
 };
 
 struct SPMVFunctor {
@@ -20,9 +21,16 @@ struct SPMVFunctor {
     return true;
   }
   static inline void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-#pragma omp atomic
-    gdata->next[dst] += gdata->cur[src] * gdata->weight[eid];
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static inline void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
+    val += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
+  }
+  static inline int32_t GetFeatSize(GData* gdata) {
+    return 1;
+  }
+  static inline float* GetOutBuf(GData* gdata) {
+    return gdata->next;
   }
 };
 
@@ -86,13 +94,14 @@ int main(int argc, char** argv) {
   gdata.cur = &vvec[0];
   gdata.next = &results[0];
   gdata.weight = &evec[0];
+  gdata.eid_mapping = csr_t_mapping.data;
 
   // Compute ground truth
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMVFunctor>(
       config, spmat, &gdata, infront, nullptr,
       utils::CPUAllocator::Get());

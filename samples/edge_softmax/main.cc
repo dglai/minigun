@@ -14,6 +14,7 @@ struct GData {
   float* sum{nullptr};  // ndata
   float* max{nullptr};  // ndata
   float* score{nullptr};
+  int* eid_mapping{nullptr};
 };
 
 // Max
@@ -23,13 +24,17 @@ struct EdgeMax {
     return true;
   }
   static inline void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static inline void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int32_t dim = gdata->dim;
-    for (int32_t fid = 0; fid < dim; ++fid) {
-#pragma omp critical
-      gdata->max[dst * dim + fid] = std::max(gdata->max[dst * dim + fid],
-          gdata->score[eid * dim + fid]);
-    }
+    val = std::max(val, gdata->score[gdata->eid_mapping[eid] * dim + feat_idx]);
+  }
+  static inline int32_t GetFeatSize(GData* gdata) {
+    return gdata->dim;
+  }
+  static inline float* GetOutBuf(GData* gdata) {
+    return gdata->max;
   }
 };
 
@@ -40,13 +45,19 @@ struct MinuxMaxExpSum {
     return true;
   }
   static inline void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static inline void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int32_t dim = gdata->dim;
-    for (int32_t fid = 0; fid < dim; ++fid) {
-      gdata->score[eid * dim + fid] = expf(gdata->score[eid * dim + fid] - gdata->max[dst * dim + fid]);
-#pragma omp atomic
-      gdata->sum[dst * dim + fid] += gdata->score[eid * dim + fid];
-    }
+    gdata->score[gdata->eid_mapping[eid] * dim + feat_idx] =
+        expf(gdata->score[gdata->eid_mapping[eid] * dim + feat_idx]) - gdata->max[dst * dim + feat_idx]);
+    val += gdata->score[gdata->eid_mapping[eid] * dim + feat_idx];
+  }
+  static inline int32_t GetFeatSize(GData* gdata) {
+    return gdata->dim;
+  }
+  static inline float* GetOutBuf(GData* gdata) {
+    return gdata->sum;
   }
 };
 
@@ -62,6 +73,14 @@ struct Norm {
     for (int32_t fid = 0; fid < dim; ++fid) {
       gdata->score[eid * dim + fid] /= gdata->sum[dst * dim + fid];
     }
+  }
+  static inline void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {}
+  static inline int32_t GetFeatSize(GData* gdata) {
+    return -1;
+  }
+  static inline float* GetOutBuf(GData* gdata) {
+    return nullptr;
   }
 };
 
@@ -144,17 +163,19 @@ int main(int argc, char** argv) {
   gdata.score = &evec[0];
   gdata.max = &vvec[0];
   gdata.sum = &sum[0];
+  gdata.eid_mapping = csr_t_mapping.data;
 
   // Compute ground truth
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
-  minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, EdgeMax>(
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> ConfigDst;
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> ConfigEdge;
+  minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, EdgeMax>(
       config, spmat, &gdata, infront);
-  minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MinuxMaxExpSum>(
+  minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
       config, spmat, &gdata, infront);
-  minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, Norm>(
+  minigun::advance::Advance<kDLCPU, int32_t, float, ConfigEdge, GData, Norm>(
       config, spmat, &gdata, infront);
 
   // verify output
@@ -162,21 +183,21 @@ int main(int argc, char** argv) {
 
   const int K = 10;
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, EdgeMax>(
+    minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, EdgeMax>(
         config, spmat, &gdata, infront);
-    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MinuxMaxExpSum>(
+    minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
         config, spmat, &gdata, infront);
-    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, Norm>(
+    minigun::advance::Advance<kDLCPU, int32_t, float, ConfigEdge, GData, Norm>(
         config, spmat, &gdata, infront);
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, EdgeMax>(
+    minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, EdgeMax>(
         config, spmat, &gdata, infront);
-    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MinuxMaxExpSum>(
+    minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
         config, spmat, &gdata, infront);
-    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, Norm>(
+    minigun::advance::Advance<kDLCPU, int32_t, float, ConfigEdge, GData, Norm>(
         config, spmat, &gdata, infront);
   }
   auto end = std::chrono::system_clock::now();

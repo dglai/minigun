@@ -13,6 +13,7 @@ struct GData {
   float* cur{nullptr};
   float* next{nullptr};
   float* weight{nullptr};
+  int* eid_mapping{nullptr};
 };
 
 struct SPMMFunctor {
@@ -21,12 +22,16 @@ struct SPMMFunctor {
     return true;
   }
   static inline void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    for (int32_t fid = 0; fid < gdata->dim; ++fid) {
-#pragma omp atomic
-      gdata->next[dst * gdata->dim + fid] += gdata->cur[src * gdata->dim + fid] *
-        gdata->weight[eid];
-    }
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static inline void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
+    val += gdata->cur[src * gdata->dim + feat_idx] * gdata->weight[gdata->eid_mapping[eid]];
+  }
+  static inline int32_t GetFeatSize(GData* gdata) {
+    return gdata->dim;
+  }
+  static inline float* GetOutBuf(GData* gdata) {
+    return gdata->next;
   }
 };
 
@@ -100,6 +105,7 @@ int main(int argc, char** argv) {
   gdata.cur = &vvec[0];
   gdata.next = &results[0];
   gdata.weight = &evec[0];
+  gdata.eid_mapping = csr_t_mapping.data;
 
   // Compute ground truth
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
