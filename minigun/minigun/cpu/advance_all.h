@@ -47,10 +47,10 @@ void CPUAdvanceAllNodeParallel(
 #pragma omp parallel for
     for (Idx vid = 0; vid < N; ++vid) {
       const Idx dst = vid;
-      Idx outoff = dst * feat_size + feat_idx;
       const Idx start = csr.row_offsets.data[dst];
       const Idx end = csr.row_offsets.data[dst + 1];
       for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
+        Idx outoff = dst * feat_size + feat_idx;
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
@@ -67,10 +67,10 @@ void CPUAdvanceAllNodeParallel(
 #pragma omp parallel for
     for (Idx vid = 0; vid < N; ++vid) {
       const Idx src = vid;
-      Idx outoff = src * feat_size + feat_idx;
       const Idx start = csr.row_offsets.data[src];
       const Idx end = csr.row_offsets.data[src + 1];
       for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
+        Idx outoff = src * feat_size + feat_idx;
         if (outbuf != nullptr)
           val = outbuf[outoff];
         for (Idx eid = start; eid < end; ++eid) {
