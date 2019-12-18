@@ -42,45 +42,48 @@ void CPUAdvanceAllNodeParallel(
   Idx N = csr.row_offsets.length - 1;
   Idx feat_size = Functor::GetFeatSize(gdata);
   DType *outbuf = Functor::GetOutBuf(gdata);
-  DType val;
-  if (Config::kParallel == kDst) {
-#pragma omp parallel for
-    for (Idx vid = 0; vid < N; ++vid) {
-      const Idx dst = vid;
-      const Idx start = csr.row_offsets.data[dst];
-      const Idx end = csr.row_offsets.data[dst + 1];
-      for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
-        Idx outoff = dst * feat_size + feat_idx;
-        if (outbuf != nullptr)
-          val = outbuf[outoff];
-        for (Idx eid = start; eid < end; ++eid) {
-          const Idx src = csr.column_indices.data[eid];
-          if (Functor::CondEdge(src, dst, eid, gdata)) {
-            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+#pragma omp parallel
+  {
+    DType val;
+    if (Config::kParallel == kDst) {
+#pragma omp for
+      for (Idx vid = 0; vid < N; ++vid) {
+        const Idx dst = vid;
+        const Idx start = csr.row_offsets.data[dst];
+        const Idx end = csr.row_offsets.data[dst + 1];
+        for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
+          Idx outoff = dst * feat_size + feat_idx;
+          if (outbuf != nullptr)
+            val = outbuf[outoff];
+          for (Idx eid = start; eid < end; ++eid) {
+            const Idx src = csr.column_indices.data[eid];
+            if (Functor::CondEdge(src, dst, eid, gdata)) {
+              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+            }
           }
+          if (outbuf != nullptr)
+            outbuf[outoff] = val;
         }
-        if (outbuf != nullptr)
-          outbuf[outoff] = val;
       }
-    }
-  } else {
-#pragma omp parallel for
-    for (Idx vid = 0; vid < N; ++vid) {
-      const Idx src = vid;
-      const Idx start = csr.row_offsets.data[src];
-      const Idx end = csr.row_offsets.data[src + 1];
-      for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
-        Idx outoff = src * feat_size + feat_idx;
-        if (outbuf != nullptr)
-          val = outbuf[outoff];
-        for (Idx eid = start; eid < end; ++eid) {
-          const Idx dst = csr.column_indices.data[eid];
-          if (Functor::CondEdge(src, dst, eid, gdata)) {
-            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+    } else {
+#pragma omp for
+      for (Idx vid = 0; vid < N; ++vid) {
+        const Idx src = vid;
+        const Idx start = csr.row_offsets.data[src];
+        const Idx end = csr.row_offsets.data[src + 1];
+        for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
+          Idx outoff = src * feat_size + feat_idx;
+          if (outbuf != nullptr)
+            val = outbuf[outoff];
+          for (Idx eid = start; eid < end; ++eid) {
+            const Idx dst = csr.column_indices.data[eid];
+            if (Functor::CondEdge(src, dst, eid, gdata)) {
+              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+            }
           }
+          if (outbuf != nullptr)
+            outbuf[outoff] = val;
         }
-        if (outbuf != nullptr)
-          outbuf[outoff] = val;
       }
     }
   }
