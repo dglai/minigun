@@ -13,7 +13,6 @@ if [ ! -d "build" ]; then
   exit 1
 fi
 
-# spmm test
 echo "===========SPMM test==========="
 for grh in bench-graphs/*;do
   for D in 8 16 32 64 128 256 512; do
