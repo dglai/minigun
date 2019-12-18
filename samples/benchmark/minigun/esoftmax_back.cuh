@@ -42,7 +42,7 @@ struct BackSoftmaxAccum {
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->accum;
   }
-  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
     return idx;
   }
 };
@@ -70,7 +70,7 @@ struct BackSoftmaxMinus {
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return nullptr;
   }
-  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
     return idx;
   }
 };

@@ -32,7 +32,7 @@ struct SPMVFunctor {
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->next;
   }
-  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
     return idx;
   }
 };
