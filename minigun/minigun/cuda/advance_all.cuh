@@ -23,7 +23,7 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     IntArray1D<Idx> output_frontier) {
   const Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
   const Idx stride_y = blockDim.y * gridDim.y;
-  const Idx eid = ty;
+  Idx eid = ty;
   while (eid < coo.column.length) {
     const Idx src = _ldg(coo.row.data + eid);
     const Idx dst = _ldg(coo.column.data + eid);
