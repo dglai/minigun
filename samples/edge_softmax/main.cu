@@ -39,6 +39,9 @@ struct EdgeMax {
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->max;
   }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+    return idx;
+  }
 };
 
 // minus max, exp and sum
@@ -61,6 +64,9 @@ struct MinuxMaxExpSum {
   }
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->sum;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+    return idx;
   }
 };
 
@@ -87,6 +93,9 @@ struct Norm {
   }
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return nullptr;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+    return idx;
   }
 };
 

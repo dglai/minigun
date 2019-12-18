@@ -20,7 +20,7 @@ template <typename Idx,
 void CPUAdvanceAllEdgeParallel(
     const Coo<Idx>& coo,
     GData *gdata) {
-  Idx E = coo.column.length;
+  const Idx E = coo.column.length;
 #pragma omp parallel for
   for (Idx eid = 0; eid < E; ++eid) {
     const Idx src = coo.row.data[eid];
@@ -39,9 +39,9 @@ template <typename Idx,
 void CPUAdvanceAllNodeParallel(
     const Csr<Idx>& csr,
     GData *gdata) {
-  Idx N = csr.row_offsets.length - 1;
-  Idx feat_size = Functor::GetFeatSize(gdata);
-  DType *outbuf = Functor::GetOutBuf(gdata);
+  const Idx N = csr.row_offsets.length - 1;
+  const Idx feat_size = Functor::GetFeatSize(gdata);
+  const DType *outbuf = Functor::GetOutBuf(gdata);
 #pragma omp parallel
   {
     DType val;
@@ -52,7 +52,7 @@ void CPUAdvanceAllNodeParallel(
         const Idx start = csr.row_offsets.data[dst];
         const Idx end = csr.row_offsets.data[dst + 1];
         for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
-          Idx outoff = dst * feat_size + feat_idx;
+          const Idx outoff = Functor::GetOutOffset(dst, gdata) * feat_size + feat_idx;
           if (outbuf != nullptr)
             val = outbuf[outoff];
           for (Idx eid = start; eid < end; ++eid) {
@@ -72,7 +72,7 @@ void CPUAdvanceAllNodeParallel(
         const Idx start = csr.row_offsets.data[src];
         const Idx end = csr.row_offsets.data[src + 1];
         for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
-          Idx outoff = src * feat_size + feat_idx;
+          const Idx outoff = Functor::GetOutOffset(src, gdata) * feat_size + feat_idx;
           if (outbuf != nullptr)
             val = outbuf[outoff];
           for (Idx eid = start; eid < end; ++eid) {

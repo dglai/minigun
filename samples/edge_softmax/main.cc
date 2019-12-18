@@ -36,6 +36,9 @@ struct EdgeMax {
   static inline float* GetOutBuf(GData* gdata) {
     return gdata->max;
   }
+  static inline int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
+  }
 };
 
 // minus max, exp and sum
@@ -59,6 +62,9 @@ struct MinuxMaxExpSum {
   static inline float* GetOutBuf(GData* gdata) {
     return gdata->sum;
   }
+  static inline int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
+  }
 };
 
 // norm
@@ -81,6 +87,9 @@ struct Norm {
   }
   static inline float* GetOutBuf(GData* gdata) {
     return nullptr;
+  }
+  static inline int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 

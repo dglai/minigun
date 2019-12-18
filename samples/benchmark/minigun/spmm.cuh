@@ -46,6 +46,9 @@ struct SPMMFunctor {
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->out;
   }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+    return idx;
+  }
 };
 
 void InitGData(const utils::SampleCsr& csr, const::minigun::IntArray eid_mapping,

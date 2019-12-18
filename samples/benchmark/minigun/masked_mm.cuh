@@ -44,6 +44,9 @@ struct MaskedMMFunctor {
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return nullptr;
   }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+    return idx;
+  }
 };
 
 void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {

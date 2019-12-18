@@ -37,6 +37,9 @@ struct MaskedMMFunctor {
   static inline float* GetOutBuf(GData* gdata) {
     return nullptr;
   }
+  static inline int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
+  }
 };
 
 const int32_t D = 128;  // number of features

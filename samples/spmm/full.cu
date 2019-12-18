@@ -33,6 +33,9 @@ struct SPMMFunctor {
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
     return gdata->next;
   }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, Gdata *gdata) {
+    return idx;
+  }
 };
 
 const int32_t D = 128;  // number of features

@@ -21,12 +21,12 @@ __global__ void CudaAdvanceAllGunrockLBOutKernel(
     Coo<Idx> coo,
     GData gdata,
     IntArray1D<Idx> output_frontier) {
-  Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
-  Idx stride_y = blockDim.y * gridDim.y;
-  Idx eid = ty;
+  const Idx ty = blockIdx.y * blockDim.y + threadIdx.y;
+  const Idx stride_y = blockDim.y * gridDim.y;
+  const Idx eid = ty;
   while (eid < coo.column.length) {
-    Idx src = _ldg(coo.row.data + eid);
-    Idx dst = _ldg(coo.column.data + eid);
+    const Idx src = _ldg(coo.row.data + eid);
+    const Idx dst = _ldg(coo.column.data + eid);
     if (Functor::CondEdge(src, dst, eid, &gdata)) {
       Functor::ApplyEdge(src, dst, eid, &gdata);
       // Add dst/eid to output frontier
@@ -95,7 +95,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
       Idx end = _ldg(csr.row_offsets.data + dst + 1);
       Idx feat_idx = tx;
       while (feat_idx < feat_size) {
-        Idx outoff = dst * feat_size + feat_idx;
+        Idx outoff = Functor::GetOutOffset(dst, &gdata) * feat_size + feat_idx;
         if (outbuf != nullptr)
           val = _ldg(outbuf + outoff);
         for (Idx eid = start; eid < end; ++eid) {
@@ -116,7 +116,7 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
       Idx end = _ldg(csr.row_offsets.data + src + 1);
       Idx feat_idx = tx;
       while (feat_idx < feat_size) {
-        Idx outoff = src * feat_size + feat_idx;
+        Idx outoff = Functor::GetOutOffset(src, &gdata) * feat_size + feat_idx;
         if (outbuf != nullptr)
           val = _ldg(outbuf + outoff);
         for (Idx eid = start; eid < end; ++eid) {
