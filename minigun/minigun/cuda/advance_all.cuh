@@ -94,18 +94,20 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
       Idx start = _ldg(csr.row_offsets.data + dst);
       Idx end = _ldg(csr.row_offsets.data + dst + 1);
       Idx feat_idx = tx;
-      while (feat_idx < feat_size) {
-        Idx outoff = Functor::GetOutOffset(dst, &gdata) * feat_size + feat_idx;
-        if (outbuf != nullptr)
-          val = _ldg(outbuf + outoff);
-        for (Idx eid = start; eid < end; ++eid) {
-          Idx src = _ldg(csr.column_indices.data + eid);
-          if (Functor::CondEdge(src, dst, eid, &gdata))
-            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
+      if (start < end) {
+        while (feat_idx < feat_size) {
+          Idx outoff = Functor::GetOutOffset(dst, &gdata) * feat_size + feat_idx;
+          if (outbuf != nullptr)
+            val = _ldg(outbuf + outoff);
+          for (Idx eid = start; eid < end; ++eid) {
+            Idx src = _ldg(csr.column_indices.data + eid);
+            if (Functor::CondEdge(src, dst, eid, &gdata))
+              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
+          }
+          if (outbuf != nullptr)
+            outbuf[outoff] = val;
+          feat_idx += stride_x;
         }
-        if (outbuf != nullptr)
-          outbuf[outoff] = val;
-        feat_idx += stride_x;
       }
       dst += stride_y;
     }
@@ -115,18 +117,20 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
       Idx start = _ldg(csr.row_offsets.data + src);
       Idx end = _ldg(csr.row_offsets.data + src + 1);
       Idx feat_idx = tx;
-      while (feat_idx < feat_size) {
-        Idx outoff = Functor::GetOutOffset(src, &gdata) * feat_size + feat_idx;
-        if (outbuf != nullptr)
-          val = _ldg(outbuf + outoff);
-        for (Idx eid = start; eid < end; ++eid) {
-          Idx dst = _ldg(csr.column_indices.data + eid);
-          if (Functor::CondEdge(src, dst, eid, &gdata))
-            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
+      if (start < end) {
+        while (feat_idx < feat_size) {
+          Idx outoff = Functor::GetOutOffset(src, &gdata) * feat_size + feat_idx;
+          if (outbuf != nullptr)
+            val = _ldg(outbuf + outoff);
+          for (Idx eid = start; eid < end; ++eid) {
+            Idx dst = _ldg(csr.column_indices.data + eid);
+            if (Functor::CondEdge(src, dst, eid, &gdata))
+              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
+          }
+          if (outbuf != nullptr)
+            outbuf[outoff] = val;
+          feat_idx += stride_x;
         }
-        if (outbuf != nullptr)
-          outbuf[outoff] = val;
-        feat_idx += stride_x;
       }
       src += stride_y;
     }

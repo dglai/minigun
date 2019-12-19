@@ -51,18 +51,20 @@ void CPUAdvanceAllNodeParallel(
         const Idx dst = vid;
         const Idx start = csr.row_offsets.data[dst];
         const Idx end = csr.row_offsets.data[dst + 1];
-        for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
-          const Idx outoff = Functor::GetOutOffset(dst, gdata) * feat_size + feat_idx;
-          if (outbuf != nullptr)
-            val = outbuf[outoff];
-          for (Idx eid = start; eid < end; ++eid) {
-            const Idx src = csr.column_indices.data[eid];
-            if (Functor::CondEdge(src, dst, eid, gdata)) {
-              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+        if (start < end) {
+          for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
+            const Idx outoff = Functor::GetOutOffset(dst, gdata) * feat_size + feat_idx;
+            if (outbuf != nullptr)
+              val = outbuf[outoff];
+            for (Idx eid = start; eid < end; ++eid) {
+              const Idx src = csr.column_indices.data[eid];
+              if (Functor::CondEdge(src, dst, eid, gdata)) {
+                Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+              }
             }
+            if (outbuf != nullptr)
+              outbuf[outoff] = val;
           }
-          if (outbuf != nullptr)
-            outbuf[outoff] = val;
         }
       }
     } else {
@@ -71,18 +73,20 @@ void CPUAdvanceAllNodeParallel(
         const Idx src = vid;
         const Idx start = csr.row_offsets.data[src];
         const Idx end = csr.row_offsets.data[src + 1];
-        for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
-          const Idx outoff = Functor::GetOutOffset(src, gdata) * feat_size + feat_idx;
-          if (outbuf != nullptr)
-            val = outbuf[outoff];
-          for (Idx eid = start; eid < end; ++eid) {
-            const Idx dst = csr.column_indices.data[eid];
-            if (Functor::CondEdge(src, dst, eid, gdata)) {
-              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+        if (start < end) {
+          for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
+            const Idx outoff = Functor::GetOutOffset(src, gdata) * feat_size + feat_idx;
+            if (outbuf != nullptr)
+              val = outbuf[outoff];
+            for (Idx eid = start; eid < end; ++eid) {
+              const Idx dst = csr.column_indices.data[eid];
+              if (Functor::CondEdge(src, dst, eid, gdata)) {
+                Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+              }
             }
+            if (outbuf != nullptr)
+              outbuf[outoff] = val;
           }
-          if (outbuf != nullptr)
-            outbuf[outoff] = val;
         }
       }
     }
