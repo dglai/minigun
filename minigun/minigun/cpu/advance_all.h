@@ -44,7 +44,7 @@ void CPUAdvanceAllNodeParallel(
   DType *outbuf = Functor::GetOutBuf(gdata);
 #pragma omp parallel
   {
-    DType val;
+    DType val = static_cast<DType>(0);
     if (Config::kParallel == kDst) {
 #pragma omp for
       for (Idx vid = 0; vid < N; ++vid) {
