@@ -17,14 +17,12 @@ else()
 endif()
 
 minigun_option(USE_CUDA "Build with CUDA" ON)
-minigun_option(BUILD_SAMPLES "Build minigun samples" ON)
-minigun_option(ENABLE_PARTIAL_FRONTIER "Enable build with partial frontier support" ON)
+minigun_option(BUILD_SAMPLES "Build minigun samples" OFF)
 
 # include directories
 include_directories("minigun")
 include_directories("third_party/dlpack/include")
 include_directories("third_party/dmlc-core/include")
-include_directories("third_party/moderngpu/src")
 
 set(MINIGUN_LINKER_LIBS "")
 

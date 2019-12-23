@@ -6,9 +6,6 @@
 #include "./cuda_common.cuh"
 #include "./tuning.h"
 
-#if ENABLE_PARTIAL_FRONTIER
-#include "./advance_lb.cuh"
-#endif
 
 namespace minigun {
 namespace advance {
@@ -33,15 +30,7 @@ struct DispatchXPU<kDLGPU, Idx, DType, Config, GData, Functor, Alloc> {
       CudaAdvanceAll<Idx, DType, Config, GData, Functor, Alloc>(
           algo, rtcfg, spmat, gdata, alloc);
     } else {
-#if ENABLE_PARTIAL_FRONTIER
-      AdvanceAlg algo = FindAdvanceAlgo<Idx, Config>(rtcfg, spmat,
-          input_frontier);
-      CudaAdvanceExecutor<Idx, DType, Config, GData, Functor, Alloc> exec(
-          algo, rtcfg, *spmat.csr, gdata, input_frontier, output_frontier, alloc);
-      exec.Run();
-#else
-      LOG(FATAL) << "Partial frontier is not supported for CUDA 10.0";
-#endif
+      LOG(FATAL) << "Partial frontier is not supported yet.";
     }
   }
 };
