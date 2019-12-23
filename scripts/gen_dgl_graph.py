@@ -11,6 +11,7 @@ def main(args):
         g = build_segtree(batch_size=32, seq_len=512)
         print('#Nodes: %d #Edges: %d' % (g.number_of_nodes(), g.number_of_edges()))
         csr = g.adjacency_matrix_scipy(fmt='csr')
+        n, m = 32 * 512, 32 * 512
     else:
         data = load_data(args)
         g = data.graph
@@ -18,8 +19,9 @@ def main(args):
             csr = g.adjacency_matrix_scipy(transpose=True)
         else:
             csr = nx.to_scipy_sparse_matrix(g, weight=None, format='csr')
+        n, m = csr.indptr.shape[0] - 1, csr.indptr.shape[0] - 1
 
-    graph_io.save_graph(args.out, csr)
+    graph_io.save_graph(args.out, csr, n, m)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

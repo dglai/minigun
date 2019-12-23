@@ -6,12 +6,12 @@ import graph_io
 def gen_er(args):
     g = nx.fast_gnp_random_graph(args.er_n, args.er_p)
     csr = nx.to_scipy_sparse_matrix(g, weight=None, format='csr')
-    graph_io.save_graph(args.out, csr)
+    graph_io.save_graph(args.out, csr, args.er_n, args.er_n)
 
 def gen_ba(args):
     g = nx.barabasi_albert_graph(args.ba_n, args.ba_m)
     csr = nx.to_scipy_sparse_matrix(g, weight=None, format='csr')
-    graph_io.save_graph(args.out, csr)
+    graph_io.save_graph(args.out, csr, args.er_n, args.er_n)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

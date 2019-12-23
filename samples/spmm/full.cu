@@ -80,6 +80,8 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMalloc(&csr.column_indices.data, sizeof(int32_t) * column_indices.size()));
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
+  csr.num_rows = N;
+  csr.num_cols = N;
 
   // Create raw eid_mapping
   minigun::IntArray csr_mapping = utils::arange(0, M, kDLGPU);

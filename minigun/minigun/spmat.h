@@ -22,8 +22,8 @@ template <typename Idx>
 struct Csr {
   IntArray1D<Idx> row_offsets;  // len == num_nodes + 1
   IntArray1D<Idx> column_indices;  // len == num_edges
-  Idx num_rows;
-  Idx num_cols;
+  Idx num_rows = 0;
+  Idx num_cols = 0;
 };
 
 using IntCsr = Csr<int32_t>;
@@ -33,8 +33,8 @@ template <typename Idx>
 struct Coo {
   IntArray1D<Idx> row;
   IntArray1D<Idx> column;
-  Idx num_rows;
-  Idx num_cols;
+  Idx num_rows = 0;
+  Idx num_cols = 0;
 };
 using IntCoo = Coo<int32_t>;
 using LongCoo = Coo<int64_t>;

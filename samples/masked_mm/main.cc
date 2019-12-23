@@ -78,6 +78,8 @@ int main(int argc, char** argv) {
   csr.row_offsets.data = &row_offsets[0];
   csr.column_indices.length = column_indices.size();
   csr.column_indices.data = &column_indices[0];
+  csr.num_rows = N;
+  csr.num_cols = N;
 
   // Create raw eid_mapping
   minigun::IntArray csr_mapping = utils::arange(0, M, kDLCPU);
