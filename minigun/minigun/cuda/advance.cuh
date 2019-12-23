@@ -31,7 +31,7 @@ struct DispatchXPU<kDLGPU, Idx, DType, Config, GData, Functor, Alloc> {
     if (Config::kAdvanceAll) {
       AdvanceAlg algo = FindAdvanceAllAlgo<Idx, Config>(rtcfg, spmat);
       CudaAdvanceAll<Idx, DType, Config, GData, Functor, Alloc>(
-          algo, rtcfg, spmat, gdata, output_frontier, alloc);
+          algo, rtcfg, spmat, gdata, alloc);
     } else {
 #if ENABLE_PARTIAL_FRONTIER
       AdvanceAlg algo = FindAdvanceAlgo<Idx, Config>(rtcfg, spmat,
