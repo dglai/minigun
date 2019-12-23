@@ -65,10 +65,6 @@ void CudaAdvanceAllGunrockLBOut(
   const int by = std::min((M + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  /*
-  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-    << nthrs.x << "," << nthrs.y << ")";
-  */
   CudaAdvanceAllGunrockLBOutKernel<Idx, DType, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(coo, *gdata, output_frontier);
 }
@@ -88,52 +84,34 @@ __global__ void CudaAdvanceAllNodeParallelKernel(
   Idx feat_size = Functor::GetFeatSize(&gdata);
   DType *outbuf = Functor::GetOutBuf(&gdata);
   DType val;
-  if (Config::kParallel == kDst) {
-    Idx dst = ty;
-    while (dst < csr.row_offsets.length - 1) {
-      Idx start = _ldg(csr.row_offsets.data + dst);
-      Idx end = _ldg(csr.row_offsets.data + dst + 1);
-      Idx feat_idx = tx;
-      if (start < end) {
-        while (feat_idx < feat_size) {
-          Idx outoff = Functor::GetOutOffset(dst, &gdata) * feat_size + feat_idx;
-          if (outbuf != nullptr)
-            val = _ldg(outbuf + outoff);
-          for (Idx eid = start; eid < end; ++eid) {
-            Idx src = _ldg(csr.column_indices.data + eid);
-            if (Functor::CondEdge(src, dst, eid, &gdata))
-              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
+  Idx vid = ty;
+  while (vid < csr.row_offsets.length - 1) {
+    Idx start = _ldg(csr.row_offsets.data + vid);
+    Idx end = _ldg(csr.row_offsets.data + vid + 1);
+    Idx feat_idx = tx;
+    if (start < end) {
+      while (feat_idx < feat_size) {
+        Idx outoff = Functor::GetOutOffset(vid, &gdata) * feat_size + feat_idx;
+        if (outbuf != nullptr)
+          val = _ldg(outbuf + outoff);
+        for (Idx eid = start; eid < end; ++eid) {
+          Idx src, dst;
+          if (Config::kParallel == kDst) {
+            src = _ldg(csr.column_indices.data + eid);
+            dst = vid;
+          } else { // kSrc
+            dst = _ldg(csr.column_indices.data + eid);
+            src = vid;
           }
-          if (outbuf != nullptr)
-            outbuf[outoff] = val;
-          feat_idx += stride_x;
+          if (Functor::CondEdge(src, dst, eid, &gdata))
+            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
         }
+        if (outbuf != nullptr)
+          outbuf[outoff] = val;
+        feat_idx += stride_x;
       }
-      dst += stride_y;
     }
-  } else {
-    Idx src = ty;
-    while (src < csr.row_offsets.length - 1) {
-      Idx start = _ldg(csr.row_offsets.data + src);
-      Idx end = _ldg(csr.row_offsets.data + src + 1);
-      Idx feat_idx = tx;
-      if (start < end) {
-        while (feat_idx < feat_size) {
-          Idx outoff = Functor::GetOutOffset(src, &gdata) * feat_size + feat_idx;
-          if (outbuf != nullptr)
-            val = _ldg(outbuf + outoff);
-          for (Idx eid = start; eid < end; ++eid) {
-            Idx dst = _ldg(csr.column_indices.data + eid);
-            if (Functor::CondEdge(src, dst, eid, &gdata))
-              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, &gdata);
-          }
-          if (outbuf != nullptr)
-            outbuf[outoff] = val;
-          feat_idx += stride_x;
-        }
-      }
-      src += stride_y;
-    }
+    vid += stride_y;
   }
 }
 
@@ -157,10 +135,6 @@ void CudaAdvanceAllNodeParallel(
   const int by = std::min((N + ny - 1) / ny, static_cast<Idx>(MAX_NBLOCKS));
   const dim3 nblks(rtcfg.data_num_blocks, by);
   const dim3 nthrs(rtcfg.data_num_threads, ty);
-  /*
-  LOG(INFO) << "Blocks: (" << nblks.x << "," << nblks.y << ") Threads: ("
-    << nthrs.x << "," << nthrs.y << ")";
-  */
   CudaAdvanceAllNodeParallelKernel<Idx, DType, Config, GData, Functor>
     <<<nblks, nthrs, 0, rtcfg.stream>>>(csr, *gdata);
 }
@@ -178,22 +152,6 @@ void CudaAdvanceAll(
     GData* gdata,
     IntArray1D<Idx>* output_frontier,
     Alloc* alloc) {
-  /*
-  Idx out_len = coo.column.length;
-  if (output_frontier) {
-    if (output_frontier->data == nullptr) {
-      // Allocate output frointer buffer, the length is equal to the number
-      // of edges.
-      output_frontier->length = out_len;
-      output_frontier->data = alloc->template AllocateData<Idx>(
-          output_frontier->length * sizeof(Idx));
-    } else {
-      CHECK_GE(output_frontier->length, out_len)
-        << "Require output frontier of length " << out_len
-        << " but only got a buffer of length " << output_frontier->length;
-    }
-  }
-   */
   IntArray1D<Idx> outbuf = IntArray1D<Idx>(); //(output_frontier)? *output_frontier : IntArray1D<Idx>();
   switch (algo) {
     case kGunrockLBOut :
