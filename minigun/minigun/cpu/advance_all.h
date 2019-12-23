@@ -43,31 +43,30 @@ void CPUAdvanceAllNodeParallel(
   const Idx feat_size = Functor::GetFeatSize(gdata);
   DType *outbuf = Functor::GetOutBuf(gdata);
 #pragma omp parallel for
-    for (Idx vid = 0; vid < N; ++vid) {
-      const Idx start = csr.row_offsets.data[vid];
-      const Idx end = csr.row_offsets.data[vid + 1];
-      if (start < end) {
-        for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
-          DType val = static_cast<DType>(0);
-          const Idx outoff = Functor::GetOutOffset(vid, gdata) * feat_size + feat_idx;
-          if (outbuf != nullptr)
-            val = outbuf[outoff];
-          for (Idx eid = start; eid < end; ++eid) {
-            Idx src, dst;
-            if (Config::kParallel == kDst) {
-              src = csr.column_indices.data[eid];
-              dst = vid;
-            } else { // kSrc
-              dst = csr.column_indices.data[eid];
-              src = vid;
-            }
-            if (Functor::CondEdge(src, dst, eid, gdata)) {
-              Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
-            }
+  for (Idx vid = 0; vid < N; ++vid) {
+    const Idx start = csr.row_offsets.data[vid];
+    const Idx end = csr.row_offsets.data[vid + 1];
+    if (start < end) {
+      for (Idx feat_idx = 0; feat_idx < feat_size; ++feat_idx) {
+        DType val = static_cast<DType>(0);
+        const Idx outoff = Functor::GetOutOffset(vid, gdata) * feat_size + feat_idx;
+        if (outbuf != nullptr)
+          val = outbuf[outoff];
+        for (Idx eid = start; eid < end; ++eid) {
+          Idx src, dst;
+          if (Config::kParallel == kDst) {
+            src = csr.column_indices.data[eid];
+            dst = vid;
+          } else { // kSrc
+            dst = csr.column_indices.data[eid];
+            src = vid;
           }
-          if (outbuf != nullptr)
-            outbuf[outoff] = val;
+          if (Functor::CondEdge(src, dst, eid, gdata)) {
+            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+          }
         }
+        if (outbuf != nullptr)
+          outbuf[outoff] = val;
       }
     }
   }
