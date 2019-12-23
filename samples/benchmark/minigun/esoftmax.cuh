@@ -13,19 +13,8 @@ struct GData {
   float* sum{nullptr};
   float* max{nullptr};
   float* ret{nullptr};
+  int* eid_mapping{nullptr};
 };
-
-__device__ __forceinline__ float MyAtomicMax(float* addr, float val) {
-  uint32_t* addr_as_ui = reinterpret_cast<uint32_t*>(addr);
-  uint32_t old = *addr_as_ui;
-  uint32_t assumed = old;
-  do {
-    assumed = old;
-    old = atomicCAS(addr_as_ui, assumed,
-        __float_as_uint(fmax(val, __uint_as_float(old))));
-  } while (assumed != old);
-  return __uint_as_float(old);
-}
 
 // Max
 struct EdgeMax {
@@ -34,16 +23,21 @@ struct EdgeMax {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
-    float* inoff = gdata->score + eid * H;
-    float* outoff = gdata->max + dst * H;
-    while (tx < H) {
-      MyAtomicMax(outoff + tx, __ldg(inoff + tx));
-      tx += stride_x;
-    }
+    float* inoff = gdata->score + gdata->eid_mapping[eid] * H;
+    val = max(val, __ldg(inoff + feat_idx));
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
+    return gdata->max;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 
@@ -54,44 +48,56 @@ struct MinusMaxExpSum {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
-    const float* score_off = gdata->score + eid * H;
-    float* ret_off = gdata->ret + eid * H;
+    const float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
+    float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* max_off = gdata->max + dst * H;
-    float* sum_off = gdata->sum + dst * H;
-    while (tx < H) {
-      const float new_score = expf(__ldg(score_off + tx) - __ldg(max_off + tx));
-      atomicAdd(sum_off + tx, new_score);
-      *(ret_off + tx) = new_score;
-      tx += stride_x;
-    }
+    const float new_score = expf(__ldg(score_off + feat_idx) - __ldg(max_off + feat_idx));
+    val += new_score;
+    *(ret_off + feat_idx) = new_score;
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
+    return gdata->sum;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 
-// norm
-struct Norm {
+// norm (node parallel by destinatino)
+struct NormByDst {
   static __device__ __forceinline__ bool CondEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
-    float* ret_off = gdata->ret + eid * H;
+    float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
     float* sum_off = gdata->sum + dst * H;
-    while (tx < H) {
-      *(ret_off + tx) /= __ldg(sum_off + tx);
-      tx += stride_x;
-    }
+    *(ret_off + feat_idx) /= __ldg(sum_off + feat_idx);
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
+    return nullptr;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 
-void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
+void InitGData(const utils::SampleCsr& csr, const minigun::IntArray eid_mapping,
+    GData* gdata, GData* truth) {
   const int32_t N = csr.row_offsets.size() - 1;
   const int32_t M = csr.column_indices.size();
   const int H = gdata->H;
@@ -112,6 +118,7 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   CUDA_CALL(cudaMalloc(&(gdata->ret), sizeof(float) * M * gdata->H));
   CUDA_CALL(cudaMemcpy(gdata->ret, &ret[0],
         sizeof(float) * M * gdata->H, cudaMemcpyHostToDevice));
+  gdata->eid_mapping = eid_mapping.data;
   // compute truth
   truth->ret = new float[M * H];
   std::vector<float> tmp(N * H, 0.);

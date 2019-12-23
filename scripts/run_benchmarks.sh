@@ -13,6 +13,13 @@ if [ ! -d "build" ]; then
   exit 1
 fi
 
+echo "===========SPMM test==========="
+for grh in bench-graphs/*;do
+  for D in 8 16 32 64 128 256 512; do
+    ./build/samples/benchmark/bench_spmm ${grh} $D || exit 1
+  done
+done
+
 # masked mm test
 echo "===========Masked MM test==========="
 for grh in bench-graphs/*;do
@@ -28,16 +35,6 @@ echo "===========Edge softmax test==========="
 for grh in bench-graphs/*;do
   for H in 8 16 32; do
     ./build/samples/benchmark/bench_edge_softmax ${grh} $H || exit 1
-  done
-done
-
-# spmm test
-echo "===========SPMM test==========="
-for grh in bench-graphs/*;do
-  for D in 8 32 64 128; do
-    for H in 8 16 32; do
-      ./build/samples/benchmark/bench_spmm ${grh} $D $H || exit 1
-    done
   done
 done
 

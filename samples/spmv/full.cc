@@ -6,11 +6,13 @@
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
+#include "../samples_io.h"
 
 struct GData {
   float* cur{nullptr};
   float* next{nullptr};
   float* weight{nullptr};
+  int* eid_mapping{nullptr};
 };
 
 struct SPMVFunctor {
@@ -19,9 +21,19 @@ struct SPMVFunctor {
     return true;
   }
   static inline void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-#pragma omp atomic
-    gdata->next[dst] += gdata->cur[src] * gdata->weight[eid];
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  static inline void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
+    val += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
+  }
+  static inline int32_t GetFeatSize(GData* gdata) {
+    return 1;
+  }
+  static inline float* GetOutBuf(GData* gdata) {
+    return gdata->next;
+  }
+  static inline int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 
@@ -54,6 +66,20 @@ int main(int argc, char** argv) {
   csr.row_offsets.data = &row_offsets[0];
   csr.column_indices.length = column_indices.size();
   csr.column_indices.data = &column_indices[0];
+  csr.num_rows = N;
+  csr.num_cols = N;
+
+  // Create raw eid_mapping
+  minigun::IntArray csr_mapping = utils::arange(0, M, kDLCPU);
+
+  // Create csr_t and coo
+  minigun::IntCsr csr_t;
+  auto pack = utils::ToReverseCsr(csr, csr_mapping, kDLCPU);
+  csr_t = pack.first;
+  minigun::IntArray csr_t_mapping = pack.second;
+  minigun::IntCoo coo;
+  coo = utils::ToCoo(csr, kDLCPU);
+  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
 
   // Create Runtime Config, not used for cpu
   minigun::advance::RuntimeConfig config;
@@ -73,15 +99,16 @@ int main(int argc, char** argv) {
   gdata.cur = &vvec[0];
   gdata.next = &results[0];
   gdata.weight = &evec[0];
+  gdata.eid_mapping = csr_t_mapping.data;
 
   // Compute ground truth
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
-      config, csr, &gdata, infront, nullptr,
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
+  minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMVFunctor>(
+      config, spmat, &gdata, infront, nullptr,
       utils::CPUAllocator::Get());
 
   // verify output
@@ -89,15 +116,15 @@ int main(int argc, char** argv) {
 
   const int K = 10;
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
-        config, csr, &gdata, infront, nullptr,
+    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMVFunctor>(
+        config, spmat, &gdata, infront, nullptr,
         utils::CPUAllocator::Get());
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, SPMVFunctor>(
-        config, csr, &gdata, infront, nullptr,
+    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMVFunctor>(
+        config, spmat, &gdata, infront, nullptr,
         utils::CPUAllocator::Get());
   }
   auto end = std::chrono::system_clock::now();

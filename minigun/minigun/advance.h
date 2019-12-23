@@ -2,7 +2,7 @@
 #define MINIGUN_ADVANCE_H_
 
 #include "./base.h"
-#include "./csr.h"
+#include "spmat.h"
 #include "./mem.h"
 #ifdef __CUDACC__
 #include <cuda_runtime.h>
@@ -42,14 +42,22 @@ enum FrontierMode {
   kE2V,      // in front contains eids, out front contains vids
 };
 
+enum ParallelMode {
+  kSrc = 0, // Node parallel(by source).
+  kEdge,    // Edge parallel.
+  kDst,     // Node parallel(by destination).
+};
+
 // Static config of advance kernel
 template <bool ADVANCE_ALL,
-          FrontierMode MODE>
+          FrontierMode MODE,
+          ParallelMode PARALLEL>
 struct Config {
   // if true, the advance is applied on all the nodes
   static const bool kAdvanceAll = ADVANCE_ALL;
   // frontier mode
   static const FrontierMode kMode = MODE;
+  static const ParallelMode kParallel = PARALLEL;
 };
 
 /*!
@@ -58,6 +66,7 @@ struct Config {
  */
 template <int XPU,
           typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
@@ -66,6 +75,8 @@ struct DispatchXPU {
   static void Advance(
       const RuntimeConfig& config,
       const Csr<Idx>& csr,
+      const Csr<Idx>& csr_t,
+      const Coo<Idx>& coo,
       GData* gdata,
       IntArray1D<Idx> input_frontier,
       IntArray1D<Idx>* output_frontier,
@@ -96,12 +107,13 @@ struct DispatchXPU {
  */
 template <int XPU,
           typename Idx,
+          typename DType,
           typename Config,
           typename GData,
           typename Functor,
           typename Alloc = DefaultAllocator<XPU> >
 void Advance(const RuntimeConfig& config,
-             const Csr<Idx>& csr,
+             const SpMat<Idx>& spmat,
              GData* gdata,
              IntArray1D<Idx> input_frontier,
              IntArray1D<Idx>* output_frontier = nullptr,
@@ -110,8 +122,8 @@ void Advance(const RuntimeConfig& config,
       && output_frontier == nullptr) {
     LOG(FATAL) << "Require computing output frontier but no buffer is provided.";
   }
-  DispatchXPU<XPU, Idx, Config, GData, Functor, Alloc>::Advance(
-      config, csr, gdata,
+  DispatchXPU<XPU, Idx, DType, Config, GData, Functor, Alloc>::Advance(
+      config, spmat, gdata,
       input_frontier, output_frontier, alloc);
 }
 

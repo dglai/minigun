@@ -13,8 +13,9 @@ using minigun::advance::RuntimeConfig;
 using namespace masked_mm;
 
 double RunMinigun(const utils::SampleCsr& scsr,
-                  const minigun::IntCsr& csr,
-                  int32_t feat_size, int32_t num_heads) {
+                  const minigun::IntSpMat& spmat,
+                  int32_t feat_size,
+                  int32_t num_heads) {
   // gdata
   GData gdata, truth;
   gdata.D = feat_size;
@@ -33,9 +34,9 @@ double RunMinigun(const utils::SampleCsr& scsr,
   minigun::IntArray infront;
 
   // dry run
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MaskedMMFunctor>(
-      cfg, csr, &gdata, infront);
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MaskedMMFunctor>(
+      cfg, spmat, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -43,9 +44,9 @@ double RunMinigun(const utils::SampleCsr& scsr,
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MaskedMMFunctor>(
-        cfg, csr, &gdata, infront);
+    typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MaskedMMFunctor>(
+        cfg, spmat, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
   gettimeofday(&t1, nullptr);
@@ -119,9 +120,11 @@ int main(int argc, char** argv) {
   std::cout << "#Nodes: " << N << " #Edges: " << M << std::endl;
 
   // csr
+  minigun::IntCoo coo = utils::ToMinigunCoo(scsr, kDLGPU);
   minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
+  minigun::IntSpMat spmat = {nullptr, nullptr, &coo};
 
-  double dur1 = RunMinigun(scsr, csr, feat_size, num_heads);
+  double dur1 = RunMinigun(scsr, spmat, feat_size, num_heads);
   std::cout << "minigun time(ms): " << dur1 << std::endl;
   double dur2 = RunBaseline1(scsr, csr, feat_size, num_heads);
   std::cout << "baseline1 time(ms): " << dur2 << std::endl;

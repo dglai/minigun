@@ -22,11 +22,6 @@
 # Whether build samples.
 set(BUILD_SAMPLES OFF)
 
-# Whether enable build with partial frontier support.
-# XXX: This is a temporary flag to disable costly compilation with moderngpu.
-#      We should replace it with our own implementation later.
-set(ENABLE_PARTIAL_FRONTIER ON)
-
 #---------------------------------------------
 # Backend runtimes.
 #---------------------------------------------

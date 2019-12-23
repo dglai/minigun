@@ -6,6 +6,7 @@
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
+#include "../samples_io.h"
 
 struct GData {
   int32_t dim = 0;
@@ -26,8 +27,18 @@ struct MaskedMMFunctor {
     for (int32_t fid = 0; fid < dim; ++fid) {
       sum += gdata->ndata[src * dim + fid] * gdata->ndata[dst * dim + fid];
     }
-#pragma omp atomic
-    gdata->edata[eid] += sum;
+    gdata->edata[eid] = sum;
+  }
+  static inline void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {}
+  static inline int32_t GetFeatSize(GData* gdata) {
+    return -1;
+  }
+  static inline float* GetOutBuf(GData* gdata) {
+    return nullptr;
+  }
+  static inline int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 
@@ -67,6 +78,20 @@ int main(int argc, char** argv) {
   csr.row_offsets.data = &row_offsets[0];
   csr.column_indices.length = column_indices.size();
   csr.column_indices.data = &column_indices[0];
+  csr.num_rows = N;
+  csr.num_cols = N;
+
+  // Create raw eid_mapping
+  minigun::IntArray csr_mapping = utils::arange(0, M, kDLCPU);
+
+  // Create csr_t and coo
+  minigun::IntCsr csr_t;
+  auto pack = utils::ToReverseCsr(csr, csr_mapping, kDLCPU);
+  csr_t = pack.first;
+  minigun::IntArray csr_t_mapping = pack.second;
+  minigun::IntCoo coo;
+  coo = utils::ToCoo(csr, kDLCPU);
+  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
 
   // Create Runtime Config, not used for cpu
   minigun::advance::RuntimeConfig config;
@@ -91,27 +116,26 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, vvec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLCPU, int32_t, Config, GData, MaskedMMFunctor>(
-      config, csr, &gdata, infront);
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
+  minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MaskedMMFunctor>(
+      config, spmat, &gdata, infront);
 
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, evec) << std::endl;
 
   const int K = 10;
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, MaskedMMFunctor>(
-        config, csr, &gdata, infront);
+    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MaskedMMFunctor>(
+        config, spmat, &gdata, infront);
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLCPU, int32_t, Config, GData, MaskedMMFunctor>(
-        config, csr, &gdata, infront);
+    minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, MaskedMMFunctor>(
+        config, spmat, &gdata, infront);
   }
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
   std::cout << "Time(ms): " << elapsed_seconds.count() * 1e3 / K << std::endl;
-  return 0;
   return 0;
 }

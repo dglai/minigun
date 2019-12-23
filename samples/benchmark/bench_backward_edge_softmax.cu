@@ -14,12 +14,14 @@ using minigun::advance::RuntimeConfig;
 using namespace esoftmax_back;
 
 double RunMinigun(const utils::SampleCsr& scsr,
-                  const minigun::IntCsr& csr,
-                  int32_t feat_size, int32_t num_heads) {
+                  const minigun::IntSpMat& spmat,
+                  const minigun::IntArray& eid_mapping,
+                  int32_t feat_size,
+                  int32_t num_heads) {
   // gdata
   GData gdata, truth;
   gdata.H = num_heads;
-  InitGData(scsr, &gdata, &truth);
+  InitGData(scsr, eid_mapping, &gdata, &truth);
   CUDA_CALL(cudaDeviceSynchronize());
  
   // create stream
@@ -33,11 +35,11 @@ double RunMinigun(const utils::SampleCsr& scsr,
   minigun::IntArray infront;
 
   // dry run
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxAccum>(
-      rtcfg, csr, &gdata, infront);
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxMinus>(
-      rtcfg, csr, &gdata, infront);
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, BackSoftmaxAccum>(
+      rtcfg, spmat, &gdata, infront);
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, BackSoftmaxMinus>(
+      rtcfg, spmat, &gdata, infront);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -45,10 +47,10 @@ double RunMinigun(const utils::SampleCsr& scsr,
   timeval t0, t1;
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxAccum>(
-        rtcfg, csr, &gdata, infront);
-    minigun::advance::Advance<kDLGPU, int32_t, Config, GData, BackSoftmaxMinus>(
-        rtcfg, csr, &gdata, infront);
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, BackSoftmaxAccum>(
+        rtcfg, spmat, &gdata, infront);
+    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, BackSoftmaxMinus>(
+        rtcfg, spmat, &gdata, infront);
   }
   CUDA_CALL(cudaDeviceSynchronize());
   gettimeofday(&t1, nullptr);
@@ -89,6 +91,7 @@ std::pair<utils::SampleCsr, std::vector<int32_t>> Transpose(const utils::SampleC
 
 double RunBaseline1(const utils::SampleCsr& scsr,
                     const minigun::IntCsr& csr,
+                    const minigun::IntArray& eid_mapping,
                     int32_t feat_size, int32_t num_heads) {
   const int32_t N = csr.row_offsets.length - 1;
   const int32_t M = csr.column_indices.length;
@@ -101,7 +104,7 @@ double RunBaseline1(const utils::SampleCsr& scsr,
   // gdata
   GData gdata, truth;
   gdata.H = num_heads;
-  InitGData(scsr, &gdata, &truth);
+  InitGData(scsr, eid_mapping, &gdata, &truth);
 
   const auto& trans = Transpose(scsr);
   const auto& csr_t = utils::ToMinigunCsr(trans.first, kDLGPU);
@@ -163,10 +166,15 @@ int main(int argc, char** argv) {
 
   // csr
   minigun::IntCsr csr = utils::ToMinigunCsr(scsr, kDLGPU);
+  auto csr_mapping = utils::arange(0, M, kDLGPU);
+  auto pack = utils::ToMinigunReverseCsr(scsr, csr_mapping, kDLGPU);
+  minigun::IntCsr csr_t = pack.first;
+  minigun::IntArray csr_t_mapping = pack.second;
+  minigun::IntSpMat spmat = {nullptr, &csr_t, nullptr};
 
-  double dur1 = RunMinigun(scsr, csr, 0, num_heads);
+  double dur1 = RunMinigun(scsr, spmat, csr_t_mapping, 0, num_heads);
   std::cout << "minigun time(ms): " << dur1 << std::endl;
-  double dur2 = RunBaseline1(scsr, csr, 0, num_heads);
+  double dur2 = RunBaseline1(scsr, csr, csr_t_mapping, 0, num_heads);
   std::cout << "baseline1 time(ms): " << dur2 << std::endl;
 
 

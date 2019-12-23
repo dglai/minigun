@@ -1,0 +1,2 @@
+COPY install/ubuntu_install_core.sh /install/ubuntu_core.sh
+RUN bash /install/ubuntu_install_core.sh

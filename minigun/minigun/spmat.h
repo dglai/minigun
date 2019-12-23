@@ -22,10 +22,33 @@ template <typename Idx>
 struct Csr {
   IntArray1D<Idx> row_offsets;  // len == num_nodes + 1
   IntArray1D<Idx> column_indices;  // len == num_edges
+  Idx num_rows = 0;
+  Idx num_cols = 0;
 };
 
 using IntCsr = Csr<int32_t>;
 using LongCsr = Csr<int64_t>;
+
+template <typename Idx>
+struct Coo {
+  IntArray1D<Idx> row;
+  IntArray1D<Idx> column;
+  Idx num_rows = 0;
+  Idx num_cols = 0;
+};
+using IntCoo = Coo<int32_t>;
+using LongCoo = Coo<int64_t>;
+
+template <typename Idx>
+struct SpMat {
+  Csr<Idx>* csr = nullptr;
+  Csr<Idx>* csr_t = nullptr;
+  Coo<Idx>* coo = nullptr;
+  SpMat(Csr<Idx>* csr, Csr<Idx>* csr_t, Coo<Idx>* coo):
+    csr(csr), csr_t(csr_t), coo(coo) {}
+};
+using IntSpMat = SpMat<int32_t>;
+using LongSpMat = SpMat<int64_t>;
 
 }  // namespace minigun
 

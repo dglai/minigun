@@ -13,6 +13,7 @@ struct GData {
   float* grad_score{nullptr};
   float* accum{nullptr};
   float* out{nullptr};
+  int* eid_mapping{nullptr};
 };
 
 // backward softmax phase 0
@@ -21,23 +22,28 @@ struct BackSoftmaxAccum {
     int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
-  // accum: (N, H)
   static __device__ __forceinline__ void ApplyEdge(
-    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  // accum: (N, H)
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
     // each thread handles one attention head
-    int h = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_h = blockDim.x * gridDim.x;
-    float* score_off = gdata->score + eid * H;
-    float* grad_score_off = gdata->grad_score + eid * H;
-    float* accum_off = gdata->accum + dst * H;
-    float* ret_off = gdata->out + eid * H;
-    while (h < H) {
-      float sds = __ldg(score_off + h) * __ldg(grad_score_off + h);
-      atomicAdd(accum_off + h, sds);
-      *(ret_off + h) = sds;
-      h += stride_h;
-    }
+    float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
+    float* grad_score_off = gdata->grad_score + gdata->eid_mapping[eid] * H;
+    float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
+    float sds = __ldg(score_off + feat_idx) * __ldg(grad_score_off + feat_idx);
+    val += sds;
+    *(ret_off + feat_idx) = sds;
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
+    return gdata->accum;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 
@@ -46,25 +52,34 @@ struct BackSoftmaxMinus {
     int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     return true;
   }
-  // accum: (N, H)
   static __device__ __forceinline__ void ApplyEdge(
-    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
+  // accum: (N, H)
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
     const int H = gdata->H;
     // each thread handles one attention head
-    int h = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_h = blockDim.x * gridDim.x;
-    float* score_off = gdata->score + eid * H;
+    float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
     float* accum_off = gdata->accum + dst * H;
-    float* ret_off = gdata->out + eid * H;
-    while (h < H) {
-      *(ret_off + h) -= __ldg(score_off + h) * __ldg(accum_off + h);
-      h += stride_h;
-    }
+    float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
+    *(ret_off + feat_idx) -= __ldg(score_off + feat_idx) * __ldg(accum_off + feat_idx);
+  }
+  static __device__ __forceinline__ int32_t GetFeatSize(GData* gdata) {
+    return gdata->H;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
+    return nullptr;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 
 
-void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
+void InitGData(const utils::SampleCsr& csr,
+               const minigun::IntArray& eid_mapping,
+               GData* gdata,
+               GData* truth) {
   const int32_t N = csr.row_offsets.size() - 1;
   const int32_t M = csr.column_indices.size();
   const int H = gdata->H;
@@ -86,6 +101,8 @@ void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
   CUDA_CALL(cudaMalloc(&(gdata->grad_score), sizeof(float) * grad_score.size()));
   CUDA_CALL(cudaMemcpy(gdata->grad_score, &grad_score[0],
         sizeof(float) * grad_score.size(), cudaMemcpyHostToDevice));
+  gdata->eid_mapping = eid_mapping.data;
+
   // compute truth
   truth->out = new float[M * H];
   for (size_t u = 0; u < csr.row_offsets.size() - 1; u++) {

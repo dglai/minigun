@@ -6,6 +6,7 @@
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
+#include "../samples_io.h"
 
 struct GData {
   int32_t dim = 0;
@@ -27,7 +28,18 @@ struct MaskedMMFunctor {
       sum += gdata->ndata[src * dim + tx] * gdata->ndata[dst * dim + tx];
       tx += blockDim.x;
     }
-    atomicAdd(gdata->edata + eid, sum);
+    gdata->edata[eid] += sum;
+  }
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {}
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
+    return -1;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
+    return nullptr;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
   }
 };
 
@@ -72,11 +84,25 @@ int main(int argc, char** argv) {
   CUDA_CALL(cudaMalloc(&csr.column_indices.data, sizeof(int32_t) * column_indices.size()));
   CUDA_CALL(cudaMemcpy(csr.column_indices.data, &column_indices[0],
         sizeof(int32_t) * column_indices.size(), cudaMemcpyHostToDevice));
+  csr.num_rows = N;
+  csr.num_cols = N;
+
+  // Create raw eid_mapping
+  minigun::IntArray csr_mapping = utils::arange(0, M, kDLGPU);
+
+  // Create csr_t and coo
+  minigun::IntCsr csr_t;
+  auto pack = utils::ToReverseCsr(csr, csr_mapping, kDLGPU);
+  csr_t = pack.first;
+  minigun::IntArray csr_t_mapping = pack.second;
+  minigun::IntCoo coo;
+  coo = utils::ToCoo(csr, kDLGPU);
+  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
 
   // Create stream
   minigun::advance::RuntimeConfig config;
   config.ctx = {kDLGPU, 0};
-  config.data_num_threads = utils::_FindNumThreads(D, 32);
+  config.data_num_threads = 1;//utils::_FindNumThreads(D, 32);
   config.data_num_blocks = 1;
   CUDA_CALL(cudaStreamCreate(&config.stream));
 
@@ -103,9 +129,9 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, vvec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, Config, GData, MaskedMMFunctor>(
-      config, csr, &gdata, infront);
+  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> Config;
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MaskedMMFunctor>(
+      config, spmat, &gdata, infront);
 
   CUDA_CALL(cudaDeviceSynchronize());
 

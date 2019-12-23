@@ -36,6 +36,17 @@ struct MaskedMMFunctor {
       h += blockDim.x;
     }
   }
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {}
+  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
+    return -1;
+  }
+  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
+    return nullptr;
+  }
+  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
+    return idx;
+  }
 };
 
 void InitGData(const utils::SampleCsr& csr, GData* gdata, GData* truth) {
