@@ -24,8 +24,8 @@ struct SPMMFunctor {
   static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static __device__ __forceinline__ void ApplyEdgeReduce(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
-    val += gdata->cur[src * gdata->dim + feat_idx] * gdata->weight[gdata->eid_mapping[eid]];
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
+    *val += gdata->cur[src * gdata->dim + feat_idx] * gdata->weight[gdata->eid_mapping[eid]];
   }
   static __device__ __forceinline__ int32_t GetFeatSize(GData* gdata) {
     return gdata->dim;

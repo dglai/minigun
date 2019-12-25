@@ -62,7 +62,7 @@ void CPUAdvanceAllNodeParallel(
             src = vid;
           }
           if (Functor::CondEdge(src, dst, eid, gdata)) {
-            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, val, gdata);
+            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, &val, gdata);
           }
         }
         if (outbuf != nullptr)
