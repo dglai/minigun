@@ -30,7 +30,7 @@ struct MaskedMMFunctor {
     gdata->edata[eid] = sum;
   }
   static inline void ApplyEdgeReduce(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {}
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {}
   static inline int32_t GetFeatSize(GData* gdata) {
     return -1;
   }

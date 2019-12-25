@@ -23,8 +23,8 @@ struct SPMVFunctor {
   static inline void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static inline void ApplyEdgeReduce(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
-    val += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
+    *val += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
   }
   static inline int32_t GetFeatSize(GData* gdata) {
     return 1;

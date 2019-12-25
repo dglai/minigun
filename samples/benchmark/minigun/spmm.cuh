@@ -36,9 +36,9 @@ struct SPMMFunctor {
     }
   }
   static __device__ __forceinline__ void ApplyEdgeReduce(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
     const int D = gdata->D;
-    val += gdata->ndata[src * D + feat_idx] * gdata->weight[eid];
+    *val += gdata->ndata[src * D + feat_idx] * gdata->weight[eid];
   }
   static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
     return gdata->D;

@@ -26,14 +26,14 @@ struct BackSoftmaxAccum {
     int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   // accum: (N, H)
   static __device__ __forceinline__ void ApplyEdgeReduce(
-    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
     const int H = gdata->H;
     // each thread handles one attention head
     float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
     float* grad_score_off = gdata->grad_score + gdata->eid_mapping[eid] * H;
     float* ret_off = gdata->out + gdata->eid_mapping[eid] * H;
     float sds = __ldg(score_off + feat_idx) * __ldg(grad_score_off + feat_idx);
-    val += sds;
+    *val += sds;
     *(ret_off + feat_idx) = sds;
   }
   static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
@@ -56,7 +56,7 @@ struct BackSoftmaxMinus {
     int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   // accum: (N, H)
   static __device__ __forceinline__ void ApplyEdgeReduce(
-    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float& val, GData* gdata) {
+    int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
     const int H = gdata->H;
     // each thread handles one attention head
     float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
