@@ -25,7 +25,7 @@ void CPUAdvanceAllEdgeParallelCSR(
   Idx E = csr.column_indices.length;
 #pragma omp parallel for
   for (Idx eid = 0; eid < E; ++eid) {
-    const Idx src = std::lower_bound(csr.row_offsets.data, csr.row_offsets.data + csr.row_offsets.length, eid);
+    const Idx src = std::lower_bound(csr.row_offsets.data, csr.row_offsets.data + csr.row_offsets.length, eid) - csr.row_offsets.data;
     const Idx dst = csr.column_indices.data[eid];
     if (is_in_csr)
       Functor::ApplyEdge(src, dst, eid, gdata);
