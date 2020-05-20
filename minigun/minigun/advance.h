@@ -92,4 +92,10 @@ void Advance(const RuntimeConfig& config,
 }  // namespace advance
 }  // namespace minigun
 
+#ifdef __CUDACC__
+#include "./cuda/advance.cuh"
+#else
+#include "./cpu/advance.h"
+#endif
+
 #endif  // MINIGUN_ADVANCE_H_
