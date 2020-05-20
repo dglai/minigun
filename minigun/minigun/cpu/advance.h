@@ -28,6 +28,3 @@ struct DispatchXPU<kDLCPU, Idx, DType, Config, GData, Functor, Alloc> {
 }  // namespace minigun
 
 #endif  // MINIGUN_CPU_ADVANCE_H_
-
-#ifndef MINIGUN_CPU_ADVANCE_H_
-#define MINIGUN_CPU_ADVANCE_H_
