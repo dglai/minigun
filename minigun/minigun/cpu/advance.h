@@ -3,7 +3,6 @@
 
 #include "../advance.h"
 #include "./advance_all.h"
-#include <dmlc/omp.h>
 
 namespace minigun {
 namespace advance {
@@ -19,15 +18,9 @@ struct DispatchXPU<kDLCPU, Idx, DType, Config, GData, Functor, Alloc> {
       const RuntimeConfig& rtcfg,
       const SpMat<Idx>& spmat,
       GData* gdata,
-      IntArray1D<Idx> input_frontier,
-      IntArray1D<Idx>* output_frontier,
       Alloc* alloc) {
-    if (Config::kAdvanceAll) {
-      CPUAdvanceAll<Idx, DType, Config, GData, Functor, Alloc>(
-          spmat, gdata);
-    } else {
-      LOG(FATAL) << "Partial frontier is not supported yet.";
-    }
+    CPUAdvanceAll<Idx, DType, Config, GData, Functor, Alloc>(
+        csr, gdata, alloc);
   }
 };
 
@@ -35,3 +28,6 @@ struct DispatchXPU<kDLCPU, Idx, DType, Config, GData, Functor, Alloc> {
 }  // namespace minigun
 
 #endif  // MINIGUN_CPU_ADVANCE_H_
+
+#ifndef MINIGUN_CPU_ADVANCE_H_
+#define MINIGUN_CPU_ADVANCE_H_
