@@ -17,10 +17,6 @@ struct GData {
 };
 
 struct SPMMFunctor {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     const int D = gdata->D;

@@ -31,16 +31,14 @@ double RunMinigun(const utils::SampleCsr& scsr,
   rtcfg.data_num_blocks = gdata.H / nt;
   CUDA_CALL(cudaStreamCreate(&rtcfg.stream));
 
-  minigun::IntArray infront;
-
   // dry run
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
+  typedef minigun::advance::Config<minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, EdgeMax>(
-      rtcfg, spmat, &gdata, infront);
+      rtcfg, spmat, &gdata);
   minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MinusMaxExpSum>(
-      rtcfg, spmat, &gdata, infront);
+      rtcfg, spmat, &gdata);
   minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, NormByDst>(
-      rtcfg, spmat, &gdata, infront);
+      rtcfg, spmat, &gdata);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -49,11 +47,11 @@ double RunMinigun(const utils::SampleCsr& scsr,
   gettimeofday(&t0, nullptr);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, EdgeMax>(
-        rtcfg, spmat, &gdata, infront);
+        rtcfg, spmat, &gdata);
     minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, MinusMaxExpSum>(
-        rtcfg, spmat, &gdata, infront);
+        rtcfg, spmat, &gdata);
     minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, NormByDst>(
-        rtcfg, spmat, &gdata, infront);
+        rtcfg, spmat, &gdata);
   }
   CUDA_CALL(cudaDeviceSynchronize());
   gettimeofday(&t1, nullptr);

@@ -18,65 +18,7 @@ struct GData {
 
 // Max
 struct EdgeMax {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
-  static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
-  static __device__ __forceinline__ void ApplyEdgeReduce(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
-    const int H = gdata->H;
-    float* inoff = gdata->score + gdata->eid_mapping[eid] * H;
-    *val = max(*val, __ldg(inoff + feat_idx));
-  }
-  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
-    return gdata->H;
-  }
-  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
-    return gdata->max;
-  }
-  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
-    return idx;
-  }
-};
-
-// minus max, exp and sum
-struct MinusMaxExpSum {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
-  static __device__ __forceinline__ void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
-  static __device__ __forceinline__ void ApplyEdgeReduce(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
-    const int H = gdata->H;
-    const float* score_off = gdata->score + gdata->eid_mapping[eid] * H;
-    float* ret_off = gdata->ret + gdata->eid_mapping[eid] * H;
-    float* max_off = gdata->max + dst * H;
-    const float new_score = expf(__ldg(score_off + feat_idx) - __ldg(max_off + feat_idx));
-    *val += new_score;
-    *(ret_off + feat_idx) = new_score;
-  }
-  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
-    return gdata->H;
-  }
-  static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
-    return gdata->sum;
-  }
-  static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
-    return idx;
-  }
-};
-
-// norm (node parallel by destinatino)
-struct NormByDst {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
-  static __device__ __forceinline__ void ApplyEdge(
+  static __device__ __forceinline__ bool static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static __device__ __forceinline__ void ApplyEdgeReduce(
       int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {

@@ -17,10 +17,6 @@ struct GData {
 };
 
 struct SPMMFunctor {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static __device__ __forceinline__ void ApplyEdgeReduce(
@@ -71,7 +67,6 @@ int main(int argc, char** argv) {
   // copy graph to gpu
   CUDA_CALL(cudaSetDevice(0));
   minigun::IntCsr csr;
-  minigun::IntArray infront;
   csr.row_offsets.length = row_offsets.size();
   CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(int32_t) * row_offsets.size()));
   CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &row_offsets[0],
@@ -129,9 +124,9 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
+  typedef minigun::advance::Config<minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
-      config, spmat, &gdata, infront, nullptr);
+      config, spmat, &gdata);
 
   CUDA_CALL(cudaDeviceSynchronize());
 
