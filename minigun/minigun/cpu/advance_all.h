@@ -48,8 +48,7 @@ void CPUAdvanceAllEdgeParallel(
   for (Idx eid = 0; eid < E; ++eid) {
     const Idx src = coo.row.data[eid];
     const Idx dst = coo.column.data[eid];
-    if (Functor::CondEdge(src, dst, eid, gdata))
-      Functor::ApplyEdge(src, dst, eid, gdata);
+    Functor::ApplyEdge(src, dst, eid, gdata);
   }
 }
 
@@ -84,9 +83,7 @@ void CPUAdvanceAllNodeParallel(
             dst = csr.column_indices.data[eid];
             src = vid;
           }
-          if (Functor::CondEdge(src, dst, eid, gdata)) {
-            Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, &val, gdata);
-          }
+          Functor::ApplyEdgeReduce(src, dst, eid, feat_idx, &val, gdata);
         }
         if (outbuf != nullptr)
           outbuf[outoff] = val;
