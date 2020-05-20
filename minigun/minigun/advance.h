@@ -91,3 +91,5 @@ void Advance(const RuntimeConfig& config,
 
 }  // namespace advance
 }  // namespace minigun
+
+#endif  // MINIGUN_ADVANCE_H_
