@@ -1,37 +1,48 @@
-/* Sample code for Sparse-Matrix-Vector multiplication.*/
+/* Sample code for Sparse-Matrix-Dense Matrix multiplication.*/
 #include <iostream>
 #include <cstdlib>
 #include <time.h>
 #include <cuda_runtime.h>
+#include <cassert>
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
 #include "../samples_io.h"
 
 struct GData {
+  int32_t dim = 0;
   float* cur{nullptr};
   float* next{nullptr};
   float* weight{nullptr};
   int* eid_mapping{nullptr};
 };
 
-struct SPMVFunctor {
+struct SPMMFunctor {
   static __device__ __forceinline__ void ApplyEdge(
-    int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
-  static __device__ __forceinline__ void ApplyEdgeReduce(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
-    *val += gdata->cur[src] * gdata->weight[gdata->eid_mapping[eid]];
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    int32_t D = gdata->dim;
+    int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t stride_x = blockDim.x * gridDim.x;
+    while (tx < D) {
+      float rst = gdata->cur[src * D + tx] * gdata->weight[eid];
+      atomicAdd(gdata->next + dst * D + tx, rst);
+      tx += stride_x;
+    }
   }
-  static __device__ __forceinline__ int32_t GetFeatSize(GData *gdata) {
-    return 1;
+  static __device__ __forceinline__ void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {}
+  static __device__ __forceinline__ int32_t GetFeatSize(GData* gdata) {
+    return -1;
   }
   static __device__ __forceinline__ float* GetOutBuf(GData* gdata) {
-    return gdata->next;
+    return nullptr;
   }
   static __device__ __forceinline__ int32_t GetOutOffset(int32_t idx, GData* gdata) {
     return idx;
   }
 };
+
+const int32_t D = 128;  // number of features
 
 std::vector<float> GroundTruth(
     const std::vector<int32_t>& row_offsets,
@@ -42,20 +53,27 @@ std::vector<float> GroundTruth(
   for (size_t u = 0; u < row_offsets.size() - 1; ++u) {
     for (int32_t eid = row_offsets[u]; eid < row_offsets[u+1]; ++eid) {
       int32_t v = column_indices[eid];
-      ret[v] += vdata[u] * edata[eid];
+      for (int32_t idx = 0; idx < D; ++idx) {
+        ret[v * D + idx] += vdata[u * D + idx] * edata[eid];
+      }
     }
   }
   return ret;
 }
 
 int main(int argc, char** argv) {
+  assert(argc == 2);
   srand(42);
+
+  // create graph
   std::vector<int32_t> row_offsets, column_indices;
-  utils::CreateNPGraph(10000, 0.01, row_offsets, column_indices);
+  utils::CreateNPGraph(1000, 0.01, row_offsets, column_indices);
   const int32_t N = row_offsets.size() - 1;
   const int32_t M = column_indices.size();
-  std::cout << "#nodes: " << N << " #edges: " << M << std::endl;
+  std::cout << "#nodes: " << N << " #edges: " << M
+    << " #feats: " << D << std::endl;
 
+  // copy graph to gpu
   CUDA_CALL(cudaSetDevice(0));
   minigun::IntCsr csr;
   csr.row_offsets.length = row_offsets.size();
@@ -79,29 +97,40 @@ int main(int argc, char** argv) {
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLGPU);
-  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
+  int mode = std::stoi(argv[1]);
+  minigun::IntSpMat spmat = {nullptr, nullptr, nullptr};
+  if (mode == 0)
+    spmat = minigun::IntSpMat({&csr, nullptr, nullptr});
+  else if (mode == 1)
+    // NOTE(zihao): need a mapping to make it work.
+    spmat = minigun::IntSpMat({nullptr, &csr_t, nullptr});
+  else if (mode == 2)
+    spmat = minigun::IntSpMat({nullptr, nullptr, &coo});
 
   // Create stream
   minigun::advance::RuntimeConfig config;
   config.ctx = {kDLGPU, 0};
+  int nt = 1; //utils::_FindNumThreads(D, 32);
+  config.data_num_threads = nt;
   config.data_num_blocks = 1;
-  config.data_num_threads = 1;
   CUDA_CALL(cudaStreamCreate(&config.stream));
 
-  // Create vdata, edata and copy to GPU
-  std::vector<float> vvec(N), evec(M);
-  for (int32_t i = 0; i < N; ++i) {
+  // Create feature data
+  std::vector<float> vvec(N * D), evec(M);
+  for (int32_t i = 0; i < N * D; ++i) {
     vvec[i] = (float)rand() / RAND_MAX;
   }
   for (int32_t i = 0; i < M; ++i) {
     evec[i] = (float)rand() / RAND_MAX;
   }
 
+  // Copy feature data to gpu
   GData gdata;
-  CUDA_CALL(cudaMalloc(&gdata.cur, sizeof(float) * N));
-  CUDA_CALL(cudaMemcpy(gdata.cur, &vvec[0], sizeof(float) * N, cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMalloc(&gdata.next, sizeof(float) * N));
-  CUDA_CALL(cudaMemset(gdata.next, 0, sizeof(float) * N));
+  gdata.dim = D;
+  CUDA_CALL(cudaMalloc(&gdata.cur, sizeof(float) * N * D));
+  CUDA_CALL(cudaMemcpy(gdata.cur, &vvec[0], sizeof(float) * N * D, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&gdata.next, sizeof(float) * N * D));
+  CUDA_CALL(cudaMemset(gdata.next, 0, sizeof(float) * N * D));
   CUDA_CALL(cudaMalloc(&gdata.weight, sizeof(float) * M));
   CUDA_CALL(cudaMemcpy(gdata.weight, &evec[0], sizeof(float) * M, cudaMemcpyHostToDevice));
   gdata.eid_mapping = csr_t_mapping.data;
@@ -112,29 +141,17 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
 
-  typedef minigun::advance::Config<minigun::advance::kDst> Config;
-  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMVFunctor>(
+  typedef minigun::advance::Config<minigun::advance::kEdge> Config;
+  minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
       config, spmat, &gdata);
 
   CUDA_CALL(cudaDeviceSynchronize());
 
   // verify output
-  std::vector<float> rst(N);
-  CUDA_CALL(cudaMemcpy(&rst[0], gdata.next, sizeof(float) * N, cudaMemcpyDeviceToHost));
-  //utils::VecPrint(rst);
+  std::vector<float> rst(N * D);
+  CUDA_CALL(cudaMemcpy(&rst[0], gdata.next, sizeof(float) * N * D, cudaMemcpyDeviceToHost));
 
   std::cout << "Correct? " << utils::VecEqual(truth, rst) << std::endl;
-
-  const int K = 10;
-  timeval t0, t1;
-  gettimeofday(&t0, nullptr);
-  for (int i = 0; i < K; ++i) {
-    minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMVFunctor>(
-        config, spmat, &gdata);
-  }
-  CUDA_CALL(cudaDeviceSynchronize());
-  gettimeofday(&t1, nullptr);
-  std::cout << "Time(ms): " << (double)(t1.tv_usec - t0.tv_usec) / K / 1000.0 << std::endl;
 
   // free
 

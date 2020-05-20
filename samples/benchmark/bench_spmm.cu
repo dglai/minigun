@@ -31,13 +31,12 @@ double RunMinigun(const utils::SampleCsr& scsr,
   rtcfg.data_num_blocks = (gdata.D + (nt * 4) - 1) / (nt * 4);
   CUDA_CALL(cudaStreamCreate(&rtcfg.stream));
 
-  minigun::IntArray infront;
   ResetGData(&gdata, scsr.row_offsets.size() - 1);
 
   // check accuracy
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> Config;
+  typedef minigun::advance::Config<minigun::advance::kDst> Config;
   minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
-      rtcfg, spmat, &gdata, infront);
+      rtcfg, spmat, &gdata);
   CUDA_CALL(cudaDeviceSynchronize());
   CheckResult(scsr, &gdata, &truth);
 
@@ -45,13 +44,13 @@ double RunMinigun(const utils::SampleCsr& scsr,
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
-        rtcfg, spmat, &gdata, infront);
+        rtcfg, spmat, &gdata);
   }
 
   cudaEventRecord(start);
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLGPU, int32_t, float, Config, GData, SPMMFunctor>(
-        rtcfg, spmat, &gdata, infront);
+        rtcfg, spmat, &gdata);
   }
   cudaEventRecord(stop);
   CUDA_CALL(cudaEventSynchronize(stop));

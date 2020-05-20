@@ -22,10 +22,6 @@ struct GData {
 
 // Max
 struct EdgeMax {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static __device__ __forceinline__ void ApplyEdgeReduce(
@@ -46,10 +42,6 @@ struct EdgeMax {
 
 // minus max, exp and sum
 struct MinuxMaxExpSum {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static __device__ __forceinline__ void ApplyEdgeReduce(
@@ -72,10 +64,6 @@ struct MinuxMaxExpSum {
 
 // norm
 struct Norm {
-  static __device__ __forceinline__ bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     int32_t tx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -140,7 +128,6 @@ int main(int argc, char** argv) {
   // copy graph to gpu
   CUDA_CALL(cudaSetDevice(0));
   minigun::IntCsr csr;
-  minigun::IntArray infront;
   csr.row_offsets.length = row_offsets.size();
   CUDA_CALL(cudaMalloc(&csr.row_offsets.data, sizeof(int32_t) * row_offsets.size()));
   CUDA_CALL(cudaMemcpy(csr.row_offsets.data, &row_offsets[0],
@@ -199,14 +186,14 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> ConfigDst;
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> ConfigEdge;
+  typedef minigun::advance::Config<minigun::advance::kDst> ConfigDst;
+  typedef minigun::advance::Config<minigun::advance::kEdge> ConfigEdge;
   minigun::advance::Advance<kDLGPU, int32_t, float, ConfigDst, GData, EdgeMax>(
-      config, spmat, &gdata, infront);
+      config, spmat, &gdata);
   minigun::advance::Advance<kDLGPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
-      config, spmat, &gdata, infront);
+      config, spmat, &gdata);
   minigun::advance::Advance<kDLGPU, int32_t, float, ConfigEdge, GData, Norm>(
-      config, spmat, &gdata, infront);
+      config, spmat, &gdata);
 
   CUDA_CALL(cudaDeviceSynchronize());
 

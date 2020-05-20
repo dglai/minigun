@@ -41,11 +41,11 @@ using LongCoo = Coo<int64_t>;
 
 template <typename Idx>
 struct SpMat {
-  Csr<Idx>* csr = nullptr;
-  Csr<Idx>* csr_t = nullptr;
+  Csr<Idx>* out_csr = nullptr;
+  Csr<Idx>* in_csr = nullptr;
   Coo<Idx>* coo = nullptr;
-  SpMat(Csr<Idx>* csr, Csr<Idx>* csr_t, Coo<Idx>* coo):
-    csr(csr), csr_t(csr_t), coo(coo) {}
+  SpMat(Csr<Idx>* out_csr, Csr<Idx>* in_csr, Coo<Idx>* coo):
+    out_csr(out_csr), in_csr(in_csr), coo(coo) {} 
 };
 using IntSpMat = SpMat<int32_t>;
 using LongSpMat = SpMat<int64_t>;

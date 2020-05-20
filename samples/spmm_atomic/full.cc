@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <dmlc/omp.h>
 #include <chrono>
+#include <cassert>
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
@@ -18,16 +19,20 @@ struct GData {
 
 struct SPMMFunctor {
   static inline void ApplyEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
-  static inline void ApplyEdgeReduce(
-      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {
-    *val += gdata->cur[src * gdata->dim + feat_idx] * gdata->weight[gdata->eid_mapping[eid]];
+      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
+    const int32_t D = gdata->dim;
+    for (int32_t fid = 0; fid < D; ++fid) {
+#pragma omp atomic
+      gdata->next[dst * D + fid] += gdata->cur[src * D + fid] * gdata->weight[eid];
+    }
   }
+  static inline void ApplyEdgeReduce(
+      int32_t src, int32_t dst, int32_t eid, int32_t feat_idx, float* val, GData* gdata) {}
   static inline int32_t GetFeatSize(GData* gdata) {
-    return gdata->dim;
+    return -1;
   }
   static inline float* GetOutBuf(GData* gdata) {
-    return gdata->next;
+    return nullptr;
   }
   static inline int32_t GetOutOffset(int32_t idx, GData* gdata) {
     return idx;
@@ -54,6 +59,7 @@ std::vector<float> GroundTruth(
 }
 
 int main(int argc, char** argv) {
+  assert(argc == 2);
   srand(42);
 
   // create graph
@@ -83,7 +89,15 @@ int main(int argc, char** argv) {
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLCPU);
-  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
+  int mode = std::stoi(argv[1]);
+  minigun::IntSpMat spmat = {nullptr, nullptr, nullptr};
+  if (mode == 0)
+    spmat = minigun::IntSpMat({&csr, nullptr, nullptr});
+  else if (mode == 1)
+    // NOTE(zihao): need a mapping to make it work
+    spmat = minigun::IntSpMat({nullptr, &csr_t, nullptr});
+  else if (mode == 2)
+    spmat = minigun::IntSpMat({nullptr, nullptr, &coo});
 
   // Create Runtime Config, not used for cpu
   minigun::advance::RuntimeConfig config;
@@ -111,7 +125,7 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices,
       vvec, evec);
 
-  typedef minigun::advance::Config<minigun::advance::kDst> Config;
+  typedef minigun::advance::Config<minigun::advance::kEdge> Config;
   minigun::advance::Advance<kDLCPU, int32_t, float, Config, GData, SPMMFunctor>(
       config, spmat, &gdata);
 

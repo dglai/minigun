@@ -19,10 +19,6 @@ struct GData {
 
 // Max
 struct EdgeMax {
-  static inline bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static inline void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static inline void ApplyEdgeReduce(
@@ -43,10 +39,6 @@ struct EdgeMax {
 
 // minus max, exp and sum
 struct MinuxMaxExpSum {
-  static inline bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static inline void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   static inline void ApplyEdgeReduce(
@@ -69,10 +61,6 @@ struct MinuxMaxExpSum {
 
 // norm
 struct Norm {
-  static inline bool CondEdge(
-      int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static inline void ApplyEdge(
       int32_t src, int32_t dst, int32_t eid, GData* gdata) {
     const int32_t dim = gdata->dim;
@@ -133,7 +121,6 @@ int main(int argc, char** argv) {
 
   // copy graph to gpu
   minigun::IntCsr csr;
-  minigun::IntArray infront;
   csr.row_offsets.length = row_offsets.size();
   csr.row_offsets.data = &row_offsets[0];
   csr.column_indices.length = column_indices.size();
@@ -180,14 +167,14 @@ int main(int argc, char** argv) {
   std::vector<float> truth = GroundTruth(row_offsets, column_indices, evec);
   //utils::VecPrint(truth);
 
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kDst> ConfigDst;
-  typedef minigun::advance::Config<true, minigun::advance::kV2N, minigun::advance::kEdge> ConfigEdge;
+  typedef minigun::advance::Config<minigun::advance::kDst> ConfigDst;
+  typedef minigun::advance::Config<minigun::advance::kEdge> ConfigEdge;
   minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, EdgeMax>(
-      config, spmat, &gdata, infront);
+      config, spmat, &gdata);
   minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
-      config, spmat, &gdata, infront);
+      config, spmat, &gdata);
   minigun::advance::Advance<kDLCPU, int32_t, float, ConfigEdge, GData, Norm>(
-      config, spmat, &gdata, infront);
+      config, spmat, &gdata);
 
   // verify output
   std::cout << "Correct? " << utils::VecEqual(truth, evec) << std::endl;
@@ -195,21 +182,21 @@ int main(int argc, char** argv) {
   const int K = 10;
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, EdgeMax>(
-        config, spmat, &gdata, infront);
+        config, spmat, &gdata);
     minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
-        config, spmat, &gdata, infront);
+        config, spmat, &gdata);
     minigun::advance::Advance<kDLCPU, int32_t, float, ConfigEdge, GData, Norm>(
-        config, spmat, &gdata, infront);
+        config, spmat, &gdata);
   }
 
   auto start = std::chrono::system_clock::now();
   for (int i = 0; i < K; ++i) {
     minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, EdgeMax>(
-        config, spmat, &gdata, infront);
+        config, spmat, &gdata);
     minigun::advance::Advance<kDLCPU, int32_t, float, ConfigDst, GData, MinuxMaxExpSum>(
-        config, spmat, &gdata, infront);
+        config, spmat, &gdata);
     minigun::advance::Advance<kDLCPU, int32_t, float, ConfigEdge, GData, Norm>(
-        config, spmat, &gdata, infront);
+        config, spmat, &gdata);
   }
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;

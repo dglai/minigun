@@ -18,10 +18,6 @@ struct GData {
 
 // backward softmax phase 0
 struct BackSoftmaxAccum {
-  static __device__ __forceinline__ bool CondEdge(
-    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
     int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   // accum: (N, H)
@@ -48,10 +44,6 @@ struct BackSoftmaxAccum {
 };
 
 struct BackSoftmaxMinus {
-  static __device__ __forceinline__ bool CondEdge(
-    int32_t src, int32_t dst, int32_t eid, GData* gdata) {
-    return true;
-  }
   static __device__ __forceinline__ void ApplyEdge(
     int32_t src, int32_t dst, int32_t eid, GData* gdata) {}
   // accum: (N, H)
