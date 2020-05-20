@@ -44,8 +44,8 @@ struct SpMat {
   Csr<Idx>* in_csr = nullptr;
   Csr<Idx>* out_csr = nullptr;
   Coo<Idx>* coo = nullptr;
-  SpMat(Csr<Idx>* in_csr, Csr<Idx>* out_csr, Coo<Idx>* coo):
-    in_csr(in_csr), out_csr(out_csr), coo(coo) {} 
+  SpMat(Csr<Idx>* out_csr, Csr<Idx>* in_csr, Coo<Idx>* coo):
+    out_csr(out_csr), in_csr(in_csr), coo(coo) {} 
 };
 using IntSpMat = SpMat<int32_t>;
 using LongSpMat = SpMat<int64_t>;
