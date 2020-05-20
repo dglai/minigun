@@ -20,13 +20,17 @@ template <typename Idx,
           typename Alloc>
 void CPUAdvanceAllEdgeParallelCSR(
     const Csr<Idx>& csr,
-    GData *gdata) {
+    GData *gdata,
+    bool is_in_csr) {
   Idx E = csr.column_indices.length;
 #pragma omp parallel for
   for (Idx eid = 0; eid < E; ++eid) {
     const Idx src = std::lower_bound(csr.row_offsets, csr.row_offsets + csr.row_offsets.length, eid);
     const Idx dst = csr.column_indices.data[eid];
-    Functor::ApplyEdge(src, dst, eid, gdata);
+    if (is_in_csr)
+      Functor::ApplyEdge(src, dst, eid, gdata);
+    else
+      Functor::ApplyEdge(dst, src, eid, gdata);
   }  
 }
 
@@ -104,23 +108,28 @@ void CPUAdvanceAll(
   switch (Config::kParallel) {
     case kSrc:
       if (spmat.out_csr != nullptr)
-        CPUAdvanceAllNodeParallel(*spmat.out_csr, gdata);
+        CPUAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>
+          (*spmat.out_csr, gdata);
       else
         LOG(FATAL) << "out_csr need to be created in source parallel mode.";
       break;
     case kEdge:
       if (spmat.coo != nullptr)
-        CPUAdvanceAllEdgeParallel(*spmat.coo, gdata);
+        CPUAdvanceAllEdgeParallel<Idx, DType, Config, GData, Functor, Alloc>
+          (*spmat.coo, gdata);
       else if (spmat.out_csr != nullptr)
-        CPUAdvanceAllEdgeParallelCSR(*spmat.out_csr, gdata);
+        CPUAdvanceAllEdgeParallelCSR<Idx, DType, Config, GData, Functor, Alloc>
+          (*spmat.out_csr, gdata, true);
       else if (spmat.in_csr != nullptr)
-        CPUAdvanceAllEdgeParallelCSR(*spmat.in_csr, gdata);
+        CPUAdvanceAllEdgeParallelCSR<Idx, DType, Config, GData, Functor, Alloc>
+          (*spmat.in_csr, gdata, false);
       else
         LOG(FATAL) << "At least one sparse format should be created.";
       break;
     case kDst:
       if (spmat.in_csr != nullptr)
-        CPUAdvanceAllNodeParallel(*spmat.in_csr, gdata);
+        CPUAdvanceAllNodeParallel<Idx, DType, Config, GData, Functor, Alloc>
+          (*spmat.in_csr, gdata);
       else
         LOG(FATAL) << "in_csr need to be created in destination parallel mode."; 
       break;
