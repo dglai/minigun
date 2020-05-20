@@ -22,7 +22,7 @@ struct SPMMFunctor {
     const int32_t D = gdata->dim;
     for (int32_t fid = 0; fid < D; ++fid) {
 #pragma omp atomic
-      gdata->next[dst * D + fid] += gdata->cur[src * D + fid] * gdata->weight[eid * D + fid];
+      gdata->next[dst * D + fid] += gdata->cur[src * D + fid] * gdata->weight[eid];
     }
   }
   static inline void ApplyEdgeReduce(
