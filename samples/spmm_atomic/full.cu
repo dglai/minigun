@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <time.h>
 #include <cuda_runtime.h>
+#include <cassert>
 
 #include <minigun/minigun.h>
 #include "../samples_utils.h"
@@ -61,6 +62,7 @@ std::vector<float> GroundTruth(
 }
 
 int main(int argc, char** argv) {
+  assert(argc == 2);
   srand(42);
 
   // create graph
@@ -95,7 +97,15 @@ int main(int argc, char** argv) {
   minigun::IntArray csr_t_mapping = pack.second;
   minigun::IntCoo coo;
   coo = utils::ToCoo(csr, kDLGPU);
-  minigun::IntSpMat spmat = {&csr, &csr_t, &coo};
+  int mode = std::stoi(argv[1]);
+  minigun::IntSpMat spmat = {nullptr, nullptr, nullptr};
+  if (mode == 0)
+    spmat = minigun::IntSpMat({&csr, nullptr, nullptr});
+  else if (mode == 1)
+    // NOTE(zihao): need a mapping to make it work.
+    spmat = minigun::IntSpMat({nullptr, &csr_t, nullptr});
+  else if (mode == 2)
+    spmat = minigun::IntSpMat({nullptr, nullptr, &coo});
 
   // Create stream
   minigun::advance::RuntimeConfig config;
