@@ -20,7 +20,7 @@ struct DispatchXPU<kDLCPU, Idx, DType, Config, GData, Functor, Alloc> {
       GData* gdata,
       Alloc* alloc) {
     CPUAdvanceAll<Idx, DType, Config, GData, Functor, Alloc>(
-        csr, gdata, alloc);
+        spmat, gdata, alloc);
   }
 };
 
